@@ -378,7 +378,10 @@ export default function HomePage() {
                   onClick={handleCopyLinkFormulario}
                   title="Copiar enlace del formulario"
                 >
-                  <Copy className="h-5 w-5" />
+                  <div className="flex cursor-pointer flex-col items-center">
+                    <Copy className="h-5 w-5" />
+                    <span>Copiar</span>
+                  </div>
                 </Button>
               </div>
             </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   BarChart3,
   Building2,
@@ -12,6 +12,9 @@ import {
   ArrowDownToLine,
   ArrowUpToLine,
 } from "lucide-react";
+
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 
 import {
   PieChart as RechartsPieChart,
@@ -73,6 +76,9 @@ export default function EstadisticasPage() {
   const [loading, setLoading] = useState(true);
   const [errorLocal, setErrorLocal] = useState(null);
   const { setError: setErrorGlobal } = useError();
+
+  const estadisticasContentRef = useRef(null); // Ref para todo el contenido principal que queremos exportar
+  const [loadingExportPDF, setLoadingExportPDF] = useState(false);
 
   // --- Estados para los filtros ---
   const [selectedEscuela, setSelectedEscuela] = useState("Todas las Escuelas");
@@ -185,7 +191,7 @@ export default function EstadisticasPage() {
             {firstLine}
           </Text>
           <Text
-            x={x }
+            x={x}
             y={y + 6}
             fill="#000"
             textAnchor={textAnchor}
@@ -508,6 +514,119 @@ export default function EstadisticasPage() {
     selectedEstatus,
   ]);
 
+  // ** Función para generar el PDF **
+  const generarPDF = async () => {
+    setLoadingExportPDF(true);
+    try {
+      const input = estadisticasContentRef.current; // Capturamos el contenedor principal
+
+      if (!input) {
+        console.error("No se encontró el elemento para exportar a PDF.");
+        return;
+      }
+
+      // Calcular las dimensiones de la página A4 en mm
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pdfWidth = pdf.internal.pageSize.getWidth(); // Ancho real de la página en mm (aprox. 210)
+      const pdfHeight = pdf.internal.pageSize.getHeight(); // Alto real de la página en mm (aprox. 297)
+
+      // ** DEFINIR MÁRGENES (en mm) **
+      const margin = 15; // Margen de 15mm en todos los lados
+      const contentWidth = pdfWidth - margin * 2; // Ancho disponible para el contenido
+      const contentHeight = pdfHeight - margin * 2; // Alto disponible para el contenido
+
+      // Opciones para html2canvas para asegurar una buena calidad
+      // Es posible que necesites ajustar windowWidth y windowHeight para asegurar
+      // que html2canvas capture todo el scrollHeight/scrollWidth del elemento.
+      // Esto es crucial si tu contenido puede tener scroll dentro del ref.
+      const canvas = await html2canvas(input, {
+        scale: 2, // Aumenta la resolución para mejor calidad en PDF (renderiza el doble de grande)
+        useCORS: true, // Importante si tienes imágenes de diferentes dominios
+        logging: true, // Para ver logs de html2canvas en consola (quitar en prod)
+        windowWidth: input.scrollWidth, // Captura el ancho total del contenido
+        windowHeight: input.scrollHeight, // Captura el alto total del contenido
+      });
+
+      const imgData = canvas.toDataURL("image/jpeg", 0.8);
+
+      // Calcular las dimensiones de la imagen para que quepa dentro de los márgenes
+      let imgRatio = canvas.width / canvas.height; // Relación de aspecto del contenido capturado
+      let imgDisplayWidth = contentWidth; // Ancho inicial para la imagen (será el ancho del contenido)
+      let imgDisplayHeight = imgDisplayWidth / imgRatio; // Alto proporcional a ese ancho
+
+      // Si la imagen, a su ancho completo, es más alta que el espacio disponible en la página,
+      // entonces la ajustamos por la altura, manteniendo la proporción.
+      if (imgDisplayHeight > contentHeight) {
+        imgDisplayHeight = contentHeight;
+        imgDisplayWidth = imgDisplayHeight * imgRatio;
+      }
+
+      let heightLeft = imgDisplayHeight;
+      let position = margin; // Inicia la posición Y en el margen superior
+
+      // Coordenada X inicial para centrar la imagen horizontalmente
+      const startX = margin + (contentWidth - imgDisplayWidth) / 2;
+
+      // Añadir el título y la fecha
+      pdf.setFontSize(12); // Tamaño para el título
+      pdf.text("Estadísticas del Dashboard", pdfWidth / 2, margin + 10, {
+        align: "center",
+      }); // Centra el títulof
+
+      pdf.setFontSize(10); // Tamaño para la fecha
+      const today = new Date();
+      const year = today.getFullYear();
+      const month = String(today.getMonth() + 1).padStart(2, "0");
+      const day = String(today.getDate()).padStart(2, "0");
+      const dateString = `${day}-${month}-${year}`;
+      pdf.text(
+        `Fecha de Exportación: ${dateString}`,
+        pdfWidth / 2,
+        margin + 20,
+        { align: "center" }
+      ); // Centra la fecha
+
+      // Ajustar la posición inicial de la imagen para dejar espacio al título y la fecha
+      position = margin + 30; // 10 (margen inicial) + 22 (título) + 8 (espacio) + 12 (fecha) + 10 (espacio) = ~62mm de offset
+
+      pdf.addImage(
+        imgData,
+        "PNG",
+        startX,
+        position,
+        imgDisplayWidth,
+        imgDisplayHeight
+      );
+      heightLeft -= pdfHeight - position; // Restar el espacio ya ocupado en la primera página
+
+      // Si el contenido es más alto que una página, añadir más páginas
+      while (heightLeft > 0) {
+        position = -(imgDisplayHeight - (heightLeft + (pdfHeight - margin))); // Calcula la posición Y para el "corte" de la imagen en la nueva página
+        pdf.addPage();
+        pdf.addImage(
+          imgData,
+          "PNG",
+          startX,
+          position,
+          imgDisplayWidth,
+          imgDisplayHeight
+        );
+        heightLeft -= pdfHeight - margin;
+      }
+
+      // --- CAMBIOS AQUI: GENERAR EL NOMBRE DEL ARCHIVO CON FECHA EN FORMATO DD-MM-YYYY ---
+      // Re-utilizamos la lógica de fecha
+      const filename = `estadisticas_dashboard_${day}-${month}-${year}.pdf`;
+      pdf.save(filename); // Guarda el PDF con el nombre generado
+      // --- FIN CAMBIOS ---
+    } catch (error) {
+      console.error("Error al generar el PDF:", error);
+      setErrorLocal("Error al generar el PDF. Intente de nuevo más tarde.");
+    } finally {
+      setLoadingExportPDF(false);
+    }
+  };
+
   return (
     <div className="h-full bg-gradient-to-br from-slate-50 to-blue-50 px-4 sm:px-6 lg:px-8 py-8">
       {loading ? (
@@ -530,13 +649,28 @@ export default function EstadisticasPage() {
           </Alert>
         </div>
       ) : (
-        <div className="max-w-7xl mx-auto space-y-8">
+        <div className="max-w-7xl mx-auto space-y-8 ">
           {/* Título principal */}
-          <div className="mb-8">
+          <div className="mb-2">
             <h2 className="text-3xl font-bold text-gray-900">Estadísticas</h2>
-            <p className="text-gray-600 mt-2">
+            <p className="text-gray-600">
               Datos para la toma de decisiones estratégicas
             </p>
+          </div>
+          <div className="flex justify-end">
+            <Button
+              variant="secondary"
+              className="bg-red-500 text-md text-white hover:bg-red-600 cursor-pointer"
+              onClick={generarPDF}
+              disabled={loadingExportPDF}
+            >
+              {loadingExportPDF ? (
+                <Spinner size={16} className="text-white mr-2" />
+              ) : (
+                <ArrowDownToLine className="w-5 h-5 mr-2" />
+              )}
+              Exportar a PDF
+            </Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
             <div>
@@ -646,7 +780,10 @@ export default function EstadisticasPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_2fr_2fr] gap-8 mb-8">
+          <div
+            className="grid grid-cols-1 lg:grid-cols-[1.2fr_2fr_2fr] gap-8 mb-8"
+            ref={estadisticasContentRef}
+          >
             {" "}
             {/* Grid principal: 1 col móvil, 3 en grandes */}
             {/* COLUMNA 1: Indicadores y Resúmenes */}

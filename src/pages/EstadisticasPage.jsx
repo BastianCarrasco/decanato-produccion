@@ -649,7 +649,7 @@ export default function EstadisticasPage() {
           </Alert>
         </div>
       ) : (
-        <div className="max-w-7xl mx-auto space-y-8 ">
+        <div className="max-w-7xl mx-auto space-y-4 ">
           {/* Título principal */}
           <div className="mb-2">
             <h2 className="text-3xl font-bold text-gray-900">Estadísticas</h2>

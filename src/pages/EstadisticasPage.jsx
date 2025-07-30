@@ -167,40 +167,93 @@ export default function EstadisticasPage() {
   // Componente de etiqueta personalizada para PieChart
   const renderCustomizedLabel = useCallback(
     ({ cx, cy, midAngle, outerRadius, percent, index, name, value }) => {
-      const radius = outerRadius * 1.2;
-      const x = cx + radius * Math.cos(-midAngle * (Math.PI / 180));
-      const y = cy + radius * Math.sin(-midAngle * (Math.PI / 180));
-      const textAnchor = x > cx ? "start" : "end";
+      const RADIAN = Math.PI / 180;
+      // Posición de la línea de la etiqueta
+      const radius = outerRadius * 1.0; // Distancia desde el centro, ajustada
+      const x = cx + radius * Math.cos(-midAngle * RADIAN);
+      const y = cy + radius * Math.sin(-midAngle * RADIAN);
 
-      // Separar el nombre en 2 líneas si tiene más de una palabra
+      // Posición del texto de la etiqueta
+      const textX = cx + outerRadius * 1.1 * Math.cos(-midAngle * RADIAN);
+      const textY = cy + outerRadius * 1.1 * Math.sin(-midAngle * RADIAN);
+      const textAnchor = textX > cx ? "start" : "end";
+
+      // Divide el nombre si es largo
       const words = name.split(" ");
-      const firstLine = words[0];
-      const secondLine = words.slice(1).join(" ");
+      let line1 = "";
+      let line2 = "";
+      // Intenta dividir en dos líneas si es más de una palabra
+      if (words.length > 1) {
+        const mid = Math.ceil(words.length / 2);
+        line1 = words.slice(0, mid).join(" ");
+        line2 = words.slice(mid).join(" ");
+      } else {
+        line1 = name;
+      }
+
+      // Calcula el ángulo de la línea para evitar superposiciones con otras líneas
+      const sin = Math.sin(-RADIAN * midAngle);
+      const cos = Math.cos(-RADIAN * midAngle);
+
+      const sx = cx + (outerRadius + 10) * cos;
+      const sy = cy + (outerRadius + 10) * sin;
+      const mx = cx + (outerRadius + 20) * cos;
+      const my = cy + (outerRadius + 20) * sin;
+      const ex = mx + (cos >= 0 ? 1 : -1) * 22; // Longitud horizontal de la línea
+      const ey = my;
+
+      const dropShadow =
+        "drop-shadow(0px 0px 1px rgba(0, 0, 0, 0.5)) drop-shadow(0px 0px 1px rgba(0, 0, 0, 0.5))";
 
       return (
-        <>
+        <g>
+          {/* Línea que conecta el segmento con la etiqueta */}
+          <path
+            d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`}
+            stroke={"#888"}
+            fill="none"
+          />
+          {/* Círculo en el punto de la línea */}
+          <circle cx={ex} cy={ey} r={2} fill={"#888"} stroke="none" />
+          {/* Texto de la etiqueta */}
           <Text
-            x={x}
-            y={y - 6}
-            fill="#000"
+            x={ex + (cos >= 0 ? 1 : -1) * 6}
+            y={ey - (line2 ? 6 : 0)} // Ajusta la posición vertical si hay 2 líneas
             textAnchor={textAnchor}
             dominantBaseline="central"
             fontSize={12}
+            fill="#333"
             fontWeight="bold"
+            //style={{ filter: dropShadow }} // Opcional: añade sombra para mejorar contraste
           >
-            {firstLine}
+            {line1}
           </Text>
+          {line2 && (
+            <Text
+              x={ex + (cos >= 0 ? 1 : -1) * 6}
+              y={ey + 6} // Posición de la segunda línea
+              textAnchor={textAnchor}
+              dominantBaseline="central"
+              fontSize={12}
+              fill="#333"
+              //style={{ filter: dropShadow }} // Opcional: añade sombra para mejorar contraste
+            >
+              {line2}
+            </Text>
+          )}
           <Text
-            x={x}
-            y={y + 6}
-            fill="#000"
+            x={ex + (cos >= 0 ? 1 : -1) * 6}
+            y={ey + (line2 ? 18 : 6)} // Ajusta la posición del valor
             textAnchor={textAnchor}
             dominantBaseline="central"
             fontSize={12}
+            fill="#666"
+            fontWeight="bold"
+            //style={{ filter: dropShadow }} // Opcional: añade sombra para mejorar contraste
           >
-            {secondLine ? `${secondLine}: ${value}` : `${value}`}
+            {`${value}`}
           </Text>
-        </>
+        </g>
       );
     },
     []
@@ -215,7 +268,7 @@ export default function EstadisticasPage() {
       return (
         <div className="custom-tooltip bg-white p-3 border border-gray-200 rounded shadow-md">
           <p className="label font-semibold text-gray-900">{`${thematicName}`}</p>
-          <p className="intro text-blue-600">{`cantidad: ${projectCount}`}</p>
+          <p className="intro text-blue-600">{`Cantidad: ${projectCount}`}</p>
           {/* Si quieres el monto formulado o cualquier otro dato relacionado, lo puedes añadir aquí */}
           {/* <p className="desc text-gray-700">Monto: {formatMM(data.monto)}</p> */}
         </div>
@@ -915,7 +968,7 @@ export default function EstadisticasPage() {
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
                         data={filteredProyectosPorProfesor}
-                        margin={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                        margin={{ top: 10, right: 30, bottom: 80, left: 20 }}
                       >
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis
@@ -923,8 +976,9 @@ export default function EstadisticasPage() {
                           dataKey="profesor"
                           angle={-45}
                           textAnchor="end"
-                          height={120}
-                          fontSize={12}
+                          height={120} // Más altura para las etiquetas rotadas
+                          fontSize={11} // Reducir un poco el tamaño de la fuente
+                          interval={2}
                         />
                         <YAxis allowDecimals={false} />
                         <Tooltip />
@@ -955,7 +1009,7 @@ export default function EstadisticasPage() {
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
                         data={filteredProyectosPorUnidad}
-                        margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
+                        margin={{ top: 20, right: 30, bottom: 80, left: 20 }}
                       >
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis
@@ -963,8 +1017,9 @@ export default function EstadisticasPage() {
                           dataKey="unidad"
                           angle={-45}
                           textAnchor="end"
-                          height={120}
-                          fontSize={12}
+                          height={120} // Más altura para las etiquetas rotadas
+                          fontSize={11} // Reducir un poco el tamaño de la fuente
+                          interval={0}
                         />
                         <YAxis allowDecimals={false} />
                         <Tooltip />
@@ -992,7 +1047,7 @@ export default function EstadisticasPage() {
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
                         data={filteredProfesoresPorUnidad}
-                        margin={{ top: 40, right: 40, bottom: 40, left: 40 }}
+                        margin={{ top: 40, right: 30, bottom: 80, left: 20 }}
                       >
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis
@@ -1000,8 +1055,9 @@ export default function EstadisticasPage() {
                           dataKey="unidad"
                           angle={-45}
                           textAnchor="end"
-                          height={120}
-                          fontSize={12}
+                          height={120} // Más altura para las etiquetas rotadas
+                          fontSize={11} // Reducir un poco el tamaño de la fuente
+                          interval={0}
                         />
                         <YAxis allowDecimals={false} />
                         <Tooltip />
@@ -1021,7 +1077,7 @@ export default function EstadisticasPage() {
             <div className="lg:col-span-1 space-y-8">
               {" "}
               {/* Ocupa 1/3 del ancho, y deja espacio entre gráficos */}
-              {/* Proyectos por Temática (Pie Chart) */}
+              {/* Proyectos por Temática (Bar Chart horizontal) */}
               <div className="bg-white rounded-lg shadow-lg p-6">
                 <h4 className="text-lg font-semibold text-gray-900">
                   Proyectos por Temática
@@ -1049,11 +1105,11 @@ export default function EstadisticasPage() {
                         <YAxis
                           type="category"
                           dataKey="name" // `name` de { name, value } del groupAndCount
-                          textAnchor="end"
-                          height={120}
+                          textAnchor="end" // Alinea el texto a la derecha (fin)
+                          width={100} // Aumenta el ancho del área de la etiqueta Y
                           fontSize={12}
                           tickFormatter={(value) => `${value}`}
-                          interval={0}
+                          interval={2}
                         />
                         <Tooltip content={<CustomTooltip />} />
                         <Bar dataKey="value" fill="#457dca" />{" "}
@@ -1080,27 +1136,31 @@ export default function EstadisticasPage() {
                 <div className="h-80 flex items-center justify-center">
                   {filteredProyectosPorInstitucion.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
-                      <RechartsPieChart>
-                        <Pie
-                          data={filteredProyectosPorInstitucion}
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={80}
-                          dataKey="value"
-                          labelLine={false}
-                          label={renderCustomizedLabel}
-                        >
-                          {filteredProyectosPorInstitucion.map(
-                            (entry, index) => (
-                              <Cell
-                                key={`cell-${index}`}
-                                fill={bluePalette[index % bluePalette.length]}
-                              />
-                            )
-                          )}
-                        </Pie>
-                        <Tooltip />
-                      </RechartsPieChart>
+                      <BarChart
+                        data={filteredProyectosPorInstitucion}
+                        layout="vertical" // Gráfico de barras horizontal
+                        margin={{
+                          top: 20,
+                          right: 30,
+                          left: 100, // Espacio para las etiquetas del eje Y
+                          bottom: 5,
+                        }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis type="number" allowDecimals={false} />
+                        <YAxis
+                          type="category"
+                          dataKey="name"
+                          textAnchor="end"
+                          width={100} // Ancho para las etiquetas
+                          fontSize={12}
+                          interval={0} // Mantener todas las etiquetas para este gráfico, o ajusta a 1 o 2 si se superponen mucho
+                        />
+                        <Tooltip content={<CustomTooltip />} />{" "}
+                        {/* Reutilizar el CustomTooltip */}
+                        <Bar dataKey="value" fill="#77C3ED" />{" "}
+                        {/* Usar un color consistente de tu paleta */}
+                      </BarChart>
                     </ResponsiveContainer>
                   ) : (
                     <p className="text-gray-500">

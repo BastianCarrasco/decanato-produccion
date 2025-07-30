@@ -21,6 +21,12 @@ import {
   Network,
   Atom,
   RadioTower,
+  ScanFace,
+  Split,
+  Layers,
+  RectangleGoggles,
+  BookOpenCheck,
+  Telescope,
 } from "lucide-react";
 
 // Importaciones de logos (estas también podrían moverse a un archivo de constantes compartidas)
@@ -70,7 +76,7 @@ export const getStatusBadge = (estatus) => {
 
 export const getThematicBadge = (tematica) => {
   const baseClasses =
-    "flex items-center gap-1 px-3 py-2 rounded-full text-sm font-medium";
+    "flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium";
   const iconClass = "h-6 w-6";
   let icon;
   let colorClasses = "bg-sky-200 text-gray-800";
@@ -108,6 +114,18 @@ export const getThematicBadge = (tematica) => {
       break;
     case "Interdisciplina":
       icon = <Network />;
+      break;
+    case "Gemelos Digitales":
+      icon = <Layers />;
+      break;
+    case "Realidad Virtual":
+      icon = <RectangleGoggles />;
+      break;
+    case "Armonización Curricular":
+      icon = <BookOpenCheck />;
+      break;
+    case "Astronomía":
+      icon = <Telescope />;
       break;
     case "STEM":
       icon = <Atom />;

@@ -380,7 +380,7 @@ export default function VisualizacionPage() {
                 <SelectTrigger className="bg-gray-50 border-gray-200">
                   <SelectValue placeholder="Todas las instituciones" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-[400px] overflow-y-auto">
                   <SelectItem value="todos">Todas las instituciones</SelectItem>
                   {uniqueInstituciones.map((institucion) => (
                     <SelectItem key={institucion} value={institucion}>
@@ -398,7 +398,7 @@ export default function VisualizacionPage() {
                 <SelectTrigger className="bg-gray-50 border-gray-200">
                   <SelectValue placeholder="Todas las temáticas" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-[400px] overflow-y-auto">
                   <SelectItem value="todos">Todas las temáticas</SelectItem>
                   {uniqueTematicas.map((tem) => (
                     <SelectItem key={tem} value={tem}>

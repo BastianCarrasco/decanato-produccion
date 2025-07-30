@@ -21,12 +21,13 @@ import {
   Network,
   Atom,
   RadioTower,
-  ScanFace,
-  Split,
+  Code,
   Layers,
   RectangleGoggles,
   BookOpenCheck,
   Telescope,
+  ShieldAlert,
+  Radar,
 } from "lucide-react";
 
 // Importaciones de logos (estas también podrían moverse a un archivo de constantes compartidas)
@@ -36,14 +37,19 @@ import goreLogo from "../../assets/tipos_convocatorias/gore-valpo.jpg";
 import sqmLogo from "../../assets/instituciones/sqm.png";
 import codesserLogo from "../../assets/instituciones/logo-codesser2.png";
 import pucvLogo from "../../assets/instituciones/pucv.svg";
+import logoLacnic from "../../assets/instituciones/Logo-LACNIC.png";
+import armadaLogo from "../../assets/instituciones/armadaLogo.png";
 
 const INSTITUCION_LOGOS = {
   ANID: anidLogo,
   CORFO: corfoLogo,
   "GORE-Valparaíso": goreLogo,
+  "CORFO-Magallanes": corfoLogo,
   SQM: sqmLogo,
   CODESSER: codesserLogo,
   PUCV: pucvLogo,
+  LACNIC: logoLacnic,
+  "Armada de Chile": armadaLogo,
 };
 
 export const getStatusBadge = (estatus) => {
@@ -90,6 +96,18 @@ export const getThematicBadge = (tematica) => {
       break;
     case "Contaminación Lumínica":
       icon = <Lightbulb />;
+      break;
+    case "Educación":
+      icon = <GraduationCap />;
+      break;
+    case "Software":
+      icon = <Code />;
+      break;
+    case "Seguridad":
+      icon = <ShieldAlert />;
+      break;
+    case "Sensores":
+      icon = <Radar />;
       break;
     case "Minería":
       icon = <Pickaxe />;
@@ -160,11 +178,7 @@ export const renderInstitucionLogo = (nombreInstitucion) => {
         className="h-6 w-6 object-contain rounded-md border border-gray-200"
       />
     );
-  } else if (
-    nombreInstitucion === "PRIVADA" ||
-    nombreInstitucion === "CODESSER" ||
-    nombreInstitucion === "SQM"
-  ) {
+  } else if (nombreInstitucion === "PRIVADA") {
     return (
       <div className="h-5 w-5 flex items-center justify-center bg-gray-200 rounded-full text-gray-700 text-[0.7rem] font-bold flex-shrink-0">
         {nombreInstitucion === "PRIVADA"

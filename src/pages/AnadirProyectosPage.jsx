@@ -1,23 +1,20 @@
 // src/pages/AnadirProyectosPage.jsx
-import { useEffect, useState, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
+  Select, // Usaremos Select de Shadcn para ambos campos académicos
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import {
   X,
   Save,
-  UserPlus,
-  ArrowLeft,
   FolderPlus,
   CircleDollarSign,
   Tag,
@@ -26,28 +23,29 @@ import {
   Calendar,
   Landmark,
   Pin,
-  Megaphone, // Icono para Convocatoria (Input)
-  Building, // Para Institución Convocatoria
-  School, // Para Unidad Académica
-  Users, // Para Académicos
-  User, // Para el Jefe Académico (o UserCog)
-} from "lucide-react"; // Importar iconos de Lucide
+  Megaphone,
+  Building,
+  School,
+  Users, // Para Otros Académicos
+  User, // Para el Jefe Académico
+  Search, // Para el input de búsqueda dentro del SelectContent
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { Spinner } from "@/components/ui/spinner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { XCircle, Info, Search } from "lucide-react";
+import { XCircle } from "lucide-react";
 
 import { useError } from "@/contexts/ErrorContext";
 
 import proyectosService from "../api/proyectos.js";
-import funcionesService from "../api/funciones.js"; // Para academicosPorProyecto (si se usa)
+import funcionesService from "../api/funciones.js";
 import unidadesAcademicasService from "../api/unidadesacademicas.js";
 import estatusService from "../api/estatus.js";
 import institucionesConvocatoriaService from "../api/institucionconvocatoria.js";
 import apoyosService from "../api/apoyos.js";
 import tematicasService from "../api/tematicas.js";
-import tagsService from "../api/tags.js"; // Se mantiene por si se usa en el futuro, aunque no para detalle_apoyo
+import tagsService from "../api/tags.js";
 import tipoConvocatoriaService from "../api/tipoconvocatoria.js";
 import academicosService from "../api/academicos.js";
 
@@ -59,78 +57,83 @@ export default function AnadirProyectosPage() {
     comentarios: "",
     monto: "",
     id_tematica: null,
-    apoyo: null, // ID numérico de apoyo
-    detalle_apoyo: "", // SIEMPRE texto libre
+    apoyo: null,
+    detalle_apoyo: "",
     fecha_postulacion: "",
-    id_estatus: null, // ID numérico del estatus
-    convocatoria: "", // AHORA ES INPUT DE TEXTO LIBRE
-    tipo_convocatoria: null, // ID numérico del tipo de convocatoria
-    inst_conv: null, // ID numérico de la institución de la convocatoria
-    unidad: null, // ID numérico de la unidad
-    // `academicos` en `formData` ya no será un array completo, se gestionará por `selectedAcademics` y `jefeAcademico`
-    jefe_academico: null, // ID del jefe académico
+    id_estatus: null,
+    convocatoria: "",
+    tipo_convocatoria: null,
+    inst_conv: null,
+    unidad: null,
+    jefe_academico: null,
   });
 
-  const [selectedAcademics, setSelectedAcademics] = useState([]); // Array de IDs de académicos NO jefe
-  // Campos `customAcademic` y `showCustomAcademic` ya no son necesarios si solo seleccionamos de lookup
-  const [customAcademic, setCustomAcademic] = useState("");
-  const [showCustomAcademic, setShowCustomAcademic] = useState(false);
+  const [selectedAcademics, setSelectedAcademics] = useState([]);
 
-  // --- Estados para los datos de los Select (lookups) de la API ---
   const [unidadesLookup, setUnidadesLookup] = useState([]);
   const [estatusLookup, setEstatusLookup] = useState([]);
   const [institucionesLookup, setInstitucionesLookup] = useState([]);
   const [apoyosLookup, setApoyosLookup] = useState([]);
   const [tematicasLookup, setTematicasLookup] = useState([]);
-  const [tagsLookup, setTagsLookup] = useState([]); // Se mantiene, pero no usado para detalle_apoyo
+  const [tagsLookup, setTagsLookup] = useState([]);
   const [tipoConvocatoriasLookup, setTipoConvocatoriasLookup] = useState([]);
-
   const [academicosGeneralesLookup, setAcademicosGeneralesLookup] = useState(
     []
   );
-  const [academicosMap, setAcademicosMap] = useState({}); // Mapa para IDs de académico a nombres completos
+  const [academicosMap, setAcademicosMap] = useState({});
 
-  // --- Mapas auxiliares ---
-  const [apoyosMap, setApoyosMap] = useState({}); // id_apoyo -> nombre_apoyo (ej. TOTAL/PARCIAL)
+  const [apoyosMap, setApoyosMap] = useState({});
 
-  // --- Estados de carga y error generales del formulario ---
   const [loadingLookups, setLoadingLookups] = useState(true);
   const [errorLookups, setErrorLookups] = useState(null);
   const { setError: setErrorGlobal } = useError();
 
   const [academicSearchTerm, setAcademicSearchTerm] = useState("");
+  const [isOtherAcademicsSelectOpen, setIsOtherAcademicsSelectOpen] =
+    useState(false); // Nuevo estado para controlar la apertura del Select de otros académicos
 
-  // --- Handlers de Académicos Seleccionados ---
-  const handleAddAcademic = (academicId) => {
-    // academicId será el ID numérico
-    if (
-      academicId &&
-      !selectedAcademics.includes(academicId) &&
-      academicId !== formData.jefe_academico
-    ) {
-      setSelectedAcademics((prevSelected) => [...prevSelected, academicId]);
-      setAcademicSearchTerm(""); // Limpiar el término de búsqueda después de seleccionar
-    } else if (academicId === formData.jefe_academico) {
-      setErrorGlobal({
-        type: "error", // Forzar a tipo error si falló
-        title: "El académico seleccionado ya es el Jefe Académico.",
-      });
-    }
-  };
+  // Handler para Jefe Académico (Select de Shadcn)
+  const handleJefeAcademicoChange = useCallback((value) => {
+    const newJefeId = Number(value);
+    setFormData((prev) => ({ ...prev, jefe_academico: newJefeId }));
+
+    setSelectedAcademics((prevOthers) =>
+      prevOthers.filter((id) => id !== newJefeId)
+    );
+  }, []);
+
+  // Handler para seleccionar un académico de la lista de "Otros Académicos"
+  const handleSelectOtherAcademic = useCallback(
+    (academicId) => {
+      const numAcademicId = Number(academicId);
+      // Asegurarse de que el ID no sea el del jefe y no esté ya seleccionado
+      if (
+        numAcademicId &&
+        !selectedAcademics.includes(numAcademicId) &&
+        numAcademicId !== formData.jefe_academico
+      ) {
+        setSelectedAcademics((prevSelected) => [
+          ...prevSelected,
+          numAcademicId,
+        ]);
+        setAcademicSearchTerm(""); // Limpiar el término de búsqueda
+        setIsOtherAcademicsSelectOpen(false); // Cierra el SelectContent después de seleccionar
+      } else if (numAcademicId === formData.jefe_academico) {
+        setErrorGlobal({
+          type: "error",
+          title: "El académico seleccionado ya es el Jefe Académico.",
+        });
+      }
+    },
+    [selectedAcademics, formData.jefe_academico, setErrorGlobal]
+  );
 
   const handleRemoveAcademic = (academicId) => {
-    // academicId será el ID numérico
     setSelectedAcademics((prevSelected) =>
       prevSelected.filter((id) => id !== academicId)
     );
   };
 
-  // handleAddCustomAcademic ya no es relevante si solo seleccionamos de lista
-  const handleAddCustomAcademic = () => {
-    /* No usado */
-  };
-
-  // --- Fetching de todos los datos de lookups para los Selects ---
   const fetchLookupsData = async () => {
     setLoadingLookups(true);
     setErrorLookups(null);
@@ -160,14 +163,15 @@ export default function AnadirProyectosPage() {
       setEstatusLookup(estatusRes);
       setInstitucionesLookup(institucionesRes);
       setTematicasLookup(tematicasRes);
-      setTagsLookup(tagsRes); // TagsLookup se carga pero no se usa en detalle_apoyo ahora
+      setTagsLookup(tagsRes);
       setTipoConvocatoriasLookup(tipoConvocatoriasRes);
 
       const processedAcademicosGenerales = academicosGeneralesApiRes
         .map((acad) => ({
           id_academico: acad.id_academico,
-          nombre_completo:
-            `${acad.nombre} ${acad.a_paterno || ""} ${acad.a_materno || ""}`.trim(),
+          nombre_completo: `${acad.nombre || ""} ${acad.a_paterno || ""} ${
+            acad.a_materno || ""
+          }`.trim(),
         }))
         .sort((a, b) => a.nombre_completo.localeCompare(b.nombre_completo));
       setAcademicosGeneralesLookup(processedAcademicosGenerales);
@@ -190,7 +194,7 @@ export default function AnadirProyectosPage() {
     } catch (err) {
       console.error("Error fetching lookup data:", err);
       setErrorGlobal({
-        type: "error", // Forzar a tipo error si falló
+        type: "error",
         title: "Error al cargar las opciones del formulario.",
       });
     } finally {
@@ -202,36 +206,30 @@ export default function AnadirProyectosPage() {
     fetchLookupsData();
   }, []);
 
-  // Función para manejar el guardado del proyecto
   const handleSaveProject = async () => {
-    // Validaciones básicas de formulario
     if (
-      !formData.nombre || // Nombre es obligatorio
-      !formData.fecha_postulacion || // Fecha de Postulación es obligatoria
-      formData.id_estatus === null // Estatus (ID) es obligatorio
+      !formData.nombre ||
+      !formData.fecha_postulacion ||
+      formData.id_estatus === null
     ) {
       setErrorGlobal({
-        type: "error", // Forzar a tipo error si falló
+        type: "error",
         title: "Por favor, complete todos los campos obligatorios.",
       });
       return;
     }
 
-    setLoadingLookups(true); // Usamos loadingLookups para indicar que el formulario está en proceso
+    setLoadingLookups(true);
     setErrorLookups(null);
     setErrorGlobal(null);
 
     try {
-      // Construir el array de académicos para el POST
       const academicosParaPost = [];
-      // Añadir jefe académico
       if (formData.jefe_academico) {
         academicosParaPost.push({ id: formData.jefe_academico, jefe: true });
       }
-      // Añadir otros académicos
       selectedAcademics.forEach((id) => {
         if (id !== formData.jefe_academico) {
-          // Asegurarse de no duplicar al jefe si está en ambas listas
           academicosParaPost.push({ id: id, jefe: false });
         }
       });
@@ -246,13 +244,12 @@ export default function AnadirProyectosPage() {
         unidad: formData.unidad,
         id_tematica: formData.id_tematica,
         id_estatus: formData.id_estatus,
-        // id_kth: formData.id_kth || null, // Eliminado id_kth
-        convocatoria: formData.convocatoria || null, // Nombre string de la convocatoria
+        convocatoria: formData.convocatoria || null,
         tipo_convocatoria: formData.tipo_convocatoria,
         inst_conv: formData.inst_conv,
-        detalle_apoyo: formData.detalle_apoyo || null, // Texto libre
+        detalle_apoyo: formData.detalle_apoyo || null,
         apoyo: formData.apoyo,
-        academicos: academicosParaPost, // Array de objetos {id, jefe}
+        academicos: academicosParaPost,
       };
 
       const response = await proyectosService.crearProyecto(projectToSave);
@@ -262,15 +259,15 @@ export default function AnadirProyectosPage() {
           type: "success",
           title: "Proyecto guardado exitosamente!",
         });
-        navigate("/editar-proyectos"); // Redirige a la página principal
-      }, 3000); // 3000 milisegundos = 3 segundos
+        navigate("/editar-proyectos");
+      }, 3000);
     } catch (err) {
       console.error("Error guardando proyecto:", err);
       setErrorLookups(
         err.message || "Error desconocido al guardar el proyecto."
       );
       setErrorGlobal({
-        type: "error", // Forzar a tipo error si falló
+        type: "error",
         title: "No se ha podido guardar el proyecto",
       });
     } finally {
@@ -278,21 +275,32 @@ export default function AnadirProyectosPage() {
     }
   };
 
-  // Lógica de filtrado para el Select de Académicos
-  // `filteredAcademicsOptions` para el Select de Académicos (sin el jefe ya seleccionado)
-  const filteredAcademicsOptions = academicosGeneralesLookup.filter(
-    (academic) =>
-      // Excluir académicos ya seleccionados (incluido el jefe si está en la lista)
-      !selectedAcademics.includes(academic.id_academico) &&
-      academic.id_academico !== formData.jefe_academico && // Excluir también al jefe del select de otros académicos
-      academic.nombre_completo
-        .toLowerCase()
-        .includes(academicSearchTerm.toLowerCase())
-  );
+  // Lista de académicos disponibles para el Jefe (excluye solo a los de "Otros")
+  const availableAcademicsForJefe = useMemo(() => {
+    return academicosGeneralesLookup.filter(
+      (academic) => !selectedAcademics.includes(academic.id_academico)
+    );
+  }, [academicosGeneralesLookup, selectedAcademics]);
+
+  // Lista filtrada de académicos para "Otros Académicos" (excluye al jefe y ya seleccionados, y aplica búsqueda)
+  const filteredAcademicsForOthers = useMemo(() => {
+    return academicosGeneralesLookup.filter(
+      (academic) =>
+        academic.id_academico !== formData.jefe_academico && // Excluye al jefe
+        !selectedAcademics.includes(academic.id_academico) && // Excluye a los ya seleccionados en la lista de badges
+        academic.nombre_completo
+          .toLowerCase()
+          .includes(academicSearchTerm.toLowerCase())
+    );
+  }, [
+    academicosGeneralesLookup,
+    formData.jefe_academico,
+    selectedAcademics,
+    academicSearchTerm,
+  ]);
 
   return (
     <div className="h-full bg-gradient-to-br from-slate-50 to-blue-50 px-4 sm:px-6 lg:px-8 py-12">
-      {/* Mensaje de carga/error global (sin cambios) */}
       {loadingLookups && (
         <div className="flex flex-col items-center justify-center h-[calc(100vh-120px)]">
           <Spinner size={64} className="text-[#2E5C8A] mb-4" />
@@ -342,7 +350,7 @@ export default function AnadirProyectosPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, nombre: e.target.value })
                   }
-                  className="mt-1 full"
+                  className="mt-1 w-full"
                 />
                 <p className="mt-1 text-xs text-blue-600">
                   Este campo es obligatorio
@@ -365,7 +373,7 @@ export default function AnadirProyectosPage() {
                   <SelectTrigger className="mt-1 w-full">
                     <SelectValue placeholder="Seleccione un estado" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="max-h-[200px] overflow-y-auto">
                     {estatusLookup.map((status) => (
                       <SelectItem
                         key={status.id_estatus}
@@ -424,7 +432,7 @@ export default function AnadirProyectosPage() {
                   <SelectTrigger className="mt-1 w-full">
                     <SelectValue placeholder="Seleccione una temática" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="max-h-[200px] overflow-y-auto">
                     {tematicasLookup.map((theme) => (
                       <SelectItem
                         key={theme.id_tematica}
@@ -454,7 +462,7 @@ export default function AnadirProyectosPage() {
                     <SelectTrigger className="mt-1 w-full">
                       <SelectValue placeholder="Seleccione tipo de apoyo" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="max-h-[200px] overflow-y-auto">
                       {apoyosLookup.map((apoyo) => (
                         <SelectItem key={apoyo.id_apoyo} value={apoyo.id_apoyo}>
                           {apoyo.nombre}
@@ -574,7 +582,7 @@ export default function AnadirProyectosPage() {
                   <SelectTrigger className="mt-1 w-full">
                     <SelectValue placeholder="Seleccione un tipo de convocatoria" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="max-h-[200px] overflow-y-auto">
                     {tipoConvocatoriasLookup.map((conv) => (
                       <SelectItem key={conv.id} value={conv.id}>
                         {conv.nombre}
@@ -600,7 +608,7 @@ export default function AnadirProyectosPage() {
                   <SelectTrigger className="mt-1 w-full">
                     <SelectValue placeholder="Seleccione institución" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="max-h-[200px] overflow-y-auto">
                     {institucionesLookup.map((inst) => (
                       <SelectItem key={inst.id} value={inst.id}>
                         {inst.nombre}
@@ -626,7 +634,7 @@ export default function AnadirProyectosPage() {
                   <SelectTrigger className="mt-1 w-full">
                     <SelectValue placeholder="Seleccione una unidad" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="max-h-[200px] overflow-y-auto">
                     {unidadesLookup.map((unit) => (
                       <SelectItem key={unit.id_unidad} value={unit.id_unidad}>
                         {unit.nombre}
@@ -636,25 +644,23 @@ export default function AnadirProyectosPage() {
                 </Select>
               </div>
 
-              {/* JEFE ACADÉMICO */}
+              {/* JEFE ACADÉMICO - USANDO Shadcn Select */}
               <div>
                 <div className="flex gap-1">
-                  <User strokeWidth={1.5} size={20} /> {/* O UserCog */}
+                  <User strokeWidth={1.5} size={20} />
                   <Label className="text-sm font-medium text-gray-700">
                     Académico Jefe de Proyecto
                   </Label>
                 </div>
                 <Select
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, jefe_academico: value })
-                  }
+                  onValueChange={handleJefeAcademicoChange}
                   value={formData.jefe_academico || ""}
                 >
                   <SelectTrigger className="mt-1 w-full">
                     <SelectValue placeholder="Seleccione un jefe académico" />
                   </SelectTrigger>
-                  <SelectContent>
-                    {academicosGeneralesLookup.map((academic) => (
+                  <SelectContent className="max-h-[200px] overflow-y-auto">
+                    {availableAcademicsForJefe.map((academic) => (
                       <SelectItem
                         key={academic.id_academico}
                         value={academic.id_academico}
@@ -666,50 +672,72 @@ export default function AnadirProyectosPage() {
                 </Select>
               </div>
 
-              {/* OTROS ACADÉMICOS */}
+              {/* OTROS ACADÉMICOS PARTICIPANTES - USANDO Shadcn Select con búsqueda Y MULTI-SELECCIÓN DE BADGES */}
               <div>
                 <div className="flex gap-1">
                   <Users strokeWidth={1.5} size={20} />
                   <Label className="text-sm font-medium text-gray-700">
-                    Otros Académicos Participantes
+                    Otros Académicos Participantes (puede seleccionar más de
+                    uno)
                   </Label>
                 </div>
+                {/* SELECTOR REAL */}
                 <Select
-                  onValueChange={handleAddAcademic}
-                  value={academicSearchTerm} // Muestra el término de búsqueda
+                  value={""} // Mantiene el valor vacío para permitir la selección continua de nuevas opciones
+                  onValueChange={handleSelectOtherAcademic}
+                  onOpenChange={(open) => {
+                    if (!open) {
+                      setAcademicSearchTerm(""); // Limpiar búsqueda al cerrar
+                    }
+                    setIsOtherAcademicsSelectOpen(open);
+                  }}
+                  open={isOtherAcademicsSelectOpen} // Controla la apertura del SelectContent
                 >
                   <SelectTrigger className="mt-1 w-full">
                     <SelectValue placeholder="Seleccione académicos adicionales" />
                   </SelectTrigger>
-                  <SelectContent>
-                    {/* Input de búsqueda dentro del SelectContent */}
-                    <div className="relative px-2 py-1">
+                  <SelectContent className="max-h-[250px] overflow-y-auto mt-0 p-0 rounded-md shadow-md border">
+                    {/* Input de búsqueda DENTRO del SelectContent */}
+                    <div className=" px-2 py-2 sticky top-0 bg-white z-10 border-b">
                       <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                       <Input
                         type="text"
                         placeholder="Buscar académico..."
-                        className="pl-8 py-2 text-sm"
+                        className="pl-8 py-2 text-sm focus-visible:ring-offset-0 focus-visible:ring-transparent border-none shadow-none"
                         value={academicSearchTerm}
                         onChange={(e) => setAcademicSearchTerm(e.target.value)}
+                        onClick={(e) => e.stopPropagation()} // Evita que se cierre el select al hacer clic en el input
+                        // AÑADIR ESTAS DOS PROPS:
+                        onKeyDown={(e) => e.stopPropagation()} // Detiene la propagación del evento de teclado al Select
+                        onKeyUp={(e) => e.stopPropagation()} // También detiene keyup si es necesario
                       />
                     </div>
-                    <div className="my-1 border-t border-gray-200"></div>
+                    {/* Opciones filtradas */}
                     {loadingLookups ? (
-                      <SelectItem value="loading" disabled>
-                        <div className="flex items-center gap-2">
+                      <SelectItem
+                        value="loading"
+                        disabled
+                        className="text-center py-2"
+                      >
+                        <div className="flex items-center justify-center gap-2">
                           <Spinner size={16} className="text-gray-800" />{" "}
                           Cargando académicos...
                         </div>
                       </SelectItem>
-                    ) : filteredAcademicsOptions.length === 0 ? (
-                      <SelectItem value="no-data" disabled>
+                    ) : filteredAcademicsForOthers.length === 0 ? (
+                      <SelectItem
+                        value="no-data"
+                        disabled
+                        className="text-center py-2"
+                      >
                         No hay académicos disponibles.
                       </SelectItem>
                     ) : (
-                      filteredAcademicsOptions.map((academic) => (
+                      filteredAcademicsForOthers.map((academic) => (
                         <SelectItem
                           key={academic.id_academico}
                           value={academic.id_academico}
+                          className="px-4 py-2 text-sm cursor-pointer hover:bg-gray-100 data-[highlighted]:bg-gray-100"
                         >
                           {academic.nombre_completo}
                         </SelectItem>
@@ -718,21 +746,25 @@ export default function AnadirProyectosPage() {
                   </SelectContent>
                 </Select>
 
-                {/* Académicos seleccionados (badges) */}
+                {/* Badges para mostrar los académicos seleccionados */}
                 {selectedAcademics.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-2">
+                    <p className="text-sm font-medium text-gray-700 w-full mb-1">
+                      Seleccionados:
+                    </p>
                     {selectedAcademics.map(
                       (academicId) =>
                         academicosMap[academicId] && (
                           <Badge
                             key={academicId}
                             variant="secondary"
-                            className="flex items-center gap-1"
+                            className="flex items-center gap-1 bg-blue-100 text-blue-800"
                           >
                             {academicosMap[academicId]}{" "}
                             <Button
+                              type="button"
                               onClick={() => handleRemoveAcademic(academicId)}
-                              className="bg-gray-600 ml-1 w-6 h-6"
+                              className="bg-blue-300 hover:bg-blue-400 text-blue-900 p-0.5 w-5 h-5 rounded-full flex items-center justify-center"
                             >
                               <X className="w-3 h-3" />
                             </Button>

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+// Lucide icons
 import {
   BarChart3,
   Building2,
@@ -13,25 +14,52 @@ import {
   ArrowUpToLine,
 } from "lucide-react";
 
+// PDF export libraries
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import { autoTable } from "jspdf-autotable";
 
+// Recharts imports - AHORA SERÁN REEMPLAZADOS POR Chart.js
+// import {
+//   PieChart as RechartsPieChart,
+//   Cell,
+//   BarChart,
+//   Bar,
+//   XAxis,
+//   YAxis,
+//   CartesianGrid,
+//   Tooltip,
+//   ResponsiveContainer,
+//   Pie,
+//   Text,
+// } from "recharts";
+
+// Chart.js imports
+import { Bar } from "react-chartjs-2";
 import {
-  PieChart as RechartsPieChart,
-  Cell,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
   Tooltip,
-  ResponsiveContainer,
-  Pie,
-  Text,
-} from "recharts";
+  Legend,
+} from "chart.js";
 
+// Register Chart.js components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+);
+
+// Custom component for logo rendering
 import { renderInstitucionLogo } from "./components/ProjectCard.jsx";
 
+// UI components
 import {
   Select,
   SelectContent,
@@ -39,15 +67,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
 import { Button } from "@/components/ui/button";
-
 import { useError } from "@/contexts/ErrorContext";
-
 import { Spinner } from "@/components/ui/spinner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { XCircle, Info } from "lucide-react";
 
+// API services
 import funcionesService from "../api/funciones.js";
 import estadisticasService from "../api/estadisticas.js";
 import academicosService from "../api/academicos.js";
@@ -72,6 +98,7 @@ export default function EstadisticasPage() {
 
   const [tematicasDestacadas, setTematicasDestacadas] = useState([]);
   const [instrumentosPostulados, setInstrumentosPostulados] = useState([]);
+  const [allInstrumentosForPdf, setAllInstrumentosForPdf] = useState([]);
 
   const [loading, setLoading] = useState(true);
   const [errorLocal, setErrorLocal] = useState(null);
@@ -129,7 +156,7 @@ export default function EstadisticasPage() {
     []
   );
 
-  // Paleta de azules (mantener consistente para los pie charts)
+  // Paleta de azules (mantener consistente para los gráficos de barras)
   const bluePalette = [
     "#2E5C8A", // Azul principal
     "#5D95C8", // Azul medio
@@ -143,10 +170,8 @@ export default function EstadisticasPage() {
   const groupAndCount = (data, key) => {
     const counts = {};
     data.forEach((item) => {
-      // Usar el nombre mapeado si existe, o la clave directa
       const keyValue = item[`${key}_nombre`] || item[key];
       if (keyValue) {
-        // Asegura que el valor no sea nulo o vacío
         counts[keyValue] = (counts[keyValue] || 0) + 1;
       }
     });
@@ -156,7 +181,7 @@ export default function EstadisticasPage() {
   // Helper para formatear montos a MM$
   const formatMM = useCallback((monto) => {
     if (monto === null || monto === undefined || isNaN(monto)) return "0 MM$";
-    const numericMonto = parseFloat(monto); // Asegura que el monto sea un número antes de dividir
+    const numericMonto = parseFloat(monto);
     if (isNaN(numericMonto)) return "0 MM$";
     return `${(numericMonto / 1000000).toLocaleString("es-CL", {
       minimumFractionDigits: 0,
@@ -164,119 +189,8 @@ export default function EstadisticasPage() {
     })} MM$`;
   }, []);
 
-  // Componente de etiqueta personalizada para PieChart
-  const renderCustomizedLabel = useCallback(
-    ({ cx, cy, midAngle, outerRadius, percent, index, name, value }) => {
-      const RADIAN = Math.PI / 180;
-      // Posición de la línea de la etiqueta
-      const radius = outerRadius * 1.0; // Distancia desde el centro, ajustada
-      const x = cx + radius * Math.cos(-midAngle * RADIAN);
-      const y = cy + radius * Math.sin(-midAngle * RADIAN);
-
-      // Posición del texto de la etiqueta
-      const textX = cx + outerRadius * 1.1 * Math.cos(-midAngle * RADIAN);
-      const textY = cy + outerRadius * 1.1 * Math.sin(-midAngle * RADIAN);
-      const textAnchor = textX > cx ? "start" : "end";
-
-      // Divide el nombre si es largo
-      const words = name.split(" ");
-      let line1 = "";
-      let line2 = "";
-      // Intenta dividir en dos líneas si es más de una palabra
-      if (words.length > 1) {
-        const mid = Math.ceil(words.length / 2);
-        line1 = words.slice(0, mid).join(" ");
-        line2 = words.slice(mid).join(" ");
-      } else {
-        line1 = name;
-      }
-
-      // Calcula el ángulo de la línea para evitar superposiciones con otras líneas
-      const sin = Math.sin(-RADIAN * midAngle);
-      const cos = Math.cos(-RADIAN * midAngle);
-
-      const sx = cx + (outerRadius + 10) * cos;
-      const sy = cy + (outerRadius + 10) * sin;
-      const mx = cx + (outerRadius + 20) * cos;
-      const my = cy + (outerRadius + 20) * sin;
-      const ex = mx + (cos >= 0 ? 1 : -1) * 22; // Longitud horizontal de la línea
-      const ey = my;
-
-      const dropShadow =
-        "drop-shadow(0px 0px 1px rgba(0, 0, 0, 0.5)) drop-shadow(0px 0px 1px rgba(0, 0, 0, 0.5))";
-
-      return (
-        <g>
-          {/* Línea que conecta el segmento con la etiqueta */}
-          <path
-            d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`}
-            stroke={"#888"}
-            fill="none"
-          />
-          {/* Círculo en el punto de la línea */}
-          <circle cx={ex} cy={ey} r={2} fill={"#888"} stroke="none" />
-          {/* Texto de la etiqueta */}
-          <Text
-            x={ex + (cos >= 0 ? 1 : -1) * 6}
-            y={ey - (line2 ? 6 : 0)} // Ajusta la posición vertical si hay 2 líneas
-            textAnchor={textAnchor}
-            dominantBaseline="central"
-            fontSize={12}
-            fill="#333"
-            fontWeight="bold"
-            //style={{ filter: dropShadow }} // Opcional: añade sombra para mejorar contraste
-          >
-            {line1}
-          </Text>
-          {line2 && (
-            <Text
-              x={ex + (cos >= 0 ? 1 : -1) * 6}
-              y={ey + 6} // Posición de la segunda línea
-              textAnchor={textAnchor}
-              dominantBaseline="central"
-              fontSize={12}
-              fill="#333"
-              //style={{ filter: dropShadow }} // Opcional: añade sombra para mejorar contraste
-            >
-              {line2}
-            </Text>
-          )}
-          <Text
-            x={ex + (cos >= 0 ? 1 : -1) * 6}
-            y={ey + (line2 ? 18 : 6)} // Ajusta la posición del valor
-            textAnchor={textAnchor}
-            dominantBaseline="central"
-            fontSize={12}
-            fill="#666"
-            fontWeight="bold"
-            //style={{ filter: dropShadow }} // Opcional: añade sombra para mejorar contraste
-          >
-            {`${value}`}
-          </Text>
-        </g>
-      );
-    },
-    []
-  );
-
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload; // Accede a los datos del elemento sobre el que está el cursor
-      const thematicName = data.name; // El nombre de la temática (ej. "Minería")
-      const projectCount = data.value; // El conteo de proyectos (ej. 2)
-
-      return (
-        <div className="custom-tooltip bg-white p-3 border border-gray-200 rounded shadow-md">
-          <p className="label font-semibold text-gray-900">{`${thematicName}`}</p>
-          <p className="intro text-blue-600">{`Cantidad: ${projectCount}`}</p>
-          {/* Si quieres el monto formulado o cualquier otro dato relacionado, lo puedes añadir aquí */}
-          {/* <p className="desc text-gray-700">Monto: {formatMM(data.monto)}</p> */}
-        </div>
-      );
-    }
-
-    return null;
-  };
+  // Custom Tooltip (not used directly by Chart.js, Chart.js has its own built-in)
+  // const CustomTooltip = ({ active, payload, label }) => { ... };
 
   const fetchDashboardData = async () => {
     setLoading(true);
@@ -287,7 +201,7 @@ export default function EstadisticasPage() {
         proyectosRes,
         profesoresPorUnidadRes,
         proyectosPorProfesorRes,
-        unidadesRes, // unidadesAcademicasService.getAllUnidadesAcademicas()
+        unidadesRes,
       ] = await Promise.all([
         funcionesService.getDataInterseccionProyectos(),
         estadisticasService.getAcademicosPorUnidad(),
@@ -295,31 +209,22 @@ export default function EstadisticasPage() {
         unidadesAcademicasService.getAllUnidadesAcademicas(),
       ]);
 
-      // Mapear unidades académicas (id_unidad -> objeto unidad)
       const newUnidadesMap = unidadesRes.reduce((map, unidad) => {
         map[unidad.id_unidad] = unidad;
         return map;
       }, {});
       setUnidadesMap(newUnidadesMap);
-      setUnidadesData(unidadesRes); // Guarda los datos de unidades completos
+      setUnidadesData(unidadesRes);
 
-      // Los proyectos ahora se guardan crudos. Si necesitamos nombre_unidad_academica para `groupAndCount`,
-      // lo haremos en `useEffect` de filtros, o cambiaremos la `dataKey` en el gráfico si `p.unidad` es suficiente.
-      // O simplemente aceptamos que el `nombre_unidad_academica` puede ser 'Desconocida' si no hay match.
-      setProyectosData(proyectosRes); // Guardar proyectos crudos sin procesamiento adicional para nombre de líder/unidad del líder
-
-      // Aquí es donde `allProyectosPorProfesor` obtendrá sus datos directamente
+      setProyectosData(proyectosRes);
       setProyectosPorProfesorData(proyectosPorProfesorRes);
-      // Aquí `allProfesoresPorUnidad` obtendrá sus datos directamente
       setProfesoresPorUnidadData(profesoresPorUnidadRes);
 
-      // No hay `academicosData` directo de esta API, así que no lo guardamos.
-      // La cantidad de académicos involucrados se derivará de `proyectosPorProfesorRes`.
-      setAcademicosData([]); // O mantener vacío si no tenemos un source para all academicos
+      setAcademicosData([]);
     } catch (err) {
       console.error("Error fetching dashboard data:", err);
       setErrorGlobal({
-        type: "error", // Forzar a tipo error si falló
+        type: "error",
         title: "Error al cargar los datos del dashboard.",
       });
     } finally {
@@ -334,101 +239,38 @@ export default function EstadisticasPage() {
     setSelectedEstatus("Todos los Estatus");
   }, []);
 
-  // useEffect para llamar a fetchDashboardData al montar
   useEffect(() => {
     fetchDashboardData();
-    // DEBUG: Datos iniciales después del fetch
-    console.log(
-      "DEBUG: Datos iniciales - proyectosData (total):",
-      proyectosData.length,
-      proyectosData
-    );
-    console.log(
-      "DEBUG: Datos iniciales - profesoresPorUnidadData (total):",
-      profesoresPorUnidadData.length,
-      profesoresPorUnidadData
-    );
-    console.log(
-      "DEBUG: Datos iniciales - proyectosPorProfesorData (total):",
-      proyectosPorProfesorData.length,
-      proyectosPorProfesorData
-    );
-  }, []); // El array vacío asegura que se ejecute una sola vez al montar
+  }, []);
 
   // --- Lógica de filtrado ---
   useEffect(() => {
-    // DEBUG: Datos en el inicio del useEffect de filtros
-    console.log("DEBUG: --- useEffect de Filtros INICIO ---");
-    console.log("DEBUG: selectedEscuela:", selectedEscuela);
-    console.log(
-      "DEBUG: currentProyectos ANTES de filtro de escuela:",
-      proyectosData.length,
-      proyectosData
-    );
-    console.log(
-      "DEBUG: currentProfesoresPorUnidad ANTES de filtro de escuela:",
-      profesoresPorUnidadData.length,
-      profesoresPorUnidadData
-    );
-    console.log(
-      "DEBUG: currentProyectosPorProfesor ANTES de filtro de escuela:",
-      proyectosPorProfesorData.length,
-      proyectosPorProfesorData
-    );
-    // 1. Datos base para filtrar: Proyectos del estado
     let currentProyectos = proyectosData;
     let currentProfesoresPorUnidad = profesoresPorUnidadData;
     let currentProyectosPorProfesor = proyectosPorProfesorData;
 
-    // 2. Aplicar filtros SELECT (escuela, temática, institución) a `currentProyectos`
-
-    // Filtro por escuela: Este filtro afecta a 3 gráficos
+    // Filtro por escuela
     if (selectedEscuela !== "Todas las Escuelas") {
-      // Filtrar currentProyectos por la unidad del proyecto (p.unidad) si es la fuente más fiable para el filtro de escuela
       currentProyectos = proyectosData.filter(
         (p) => p.unidad === selectedEscuela
       );
-
       currentProfesoresPorUnidad = profesoresPorUnidadData.filter(
         (item) => item.UnidadAcademica === selectedEscuela
       );
-
       currentProyectosPorProfesor = proyectosPorProfesorData.filter(
         (p) => p.UnidadAcademica === selectedEscuela
       );
     } else {
-      // Si no hay filtro de escuela, usar todos los datos originales
       currentProyectos = proyectosData;
       currentProfesoresPorUnidad = profesoresPorUnidadData;
       currentProyectosPorProfesor = proyectosPorProfesorData;
     }
-
-    console.log(
-      "DEBUG: currentProyectos DESPUÉS de filtro de escuela:",
-      currentProyectos.length,
-      currentProyectos
-    );
-    console.log(
-      "DEBUG: currentProfesoresPorUnidad DESPUÉS de filtro de escuela:",
-      currentProfesoresPorUnidad.length,
-      currentProfesoresPorUnidad
-    );
-    console.log(
-      "DEBUG: currentProyectosPorProfesor DESPUÉS de filtro de escuela:",
-      currentProyectosPorProfesor.length,
-      currentProyectosPorProfesor
-    );
 
     if (selectedTematica !== "Todas las Temáticas") {
       currentProyectos = currentProyectos.filter(
         (p) => p.tematica === selectedTematica
       );
     }
-    console.log(
-      "DEBUG: currentProyectos DESPUÉS de filtro de temática:",
-      currentProyectos.length,
-      currentProyectos
-    );
 
     if (selectedInstitucion !== "Todas las Instituciones") {
       currentProyectos = currentProyectos.filter(
@@ -436,87 +278,66 @@ export default function EstadisticasPage() {
       );
     }
 
-    // Nuevo filtro por estatus
     if (selectedEstatus !== "Todos los Estatus") {
       currentProyectos = currentProyectos.filter(
         (p) => p.estatus === selectedEstatus
       );
     }
 
-    console.log(
-      "DEBUG: currentProyectos DESPUÉS de filtro de institución:",
-      currentProyectos.length,
-      currentProyectos
-    );
-    // 3. Recalcular datos para los gráficos basados en los `currentProyectos` filtrados
+    // Prepare data for Chart.js
+    // Proyectos por Temática
     setFilteredProyectosPorTematica(
       groupAndCount(currentProyectos, "tematica")
     );
+    // Proyectos por Tipo de Fondo
     setFilteredProyectosPorInstitucion(
       groupAndCount(currentProyectos, "institucion")
     );
 
-    // Actualizar estados de los gráficos
-    // Gráfico: Profesores por Unidad Académica
-
+    // Profesores por Unidad Académica
     const dataProfesoresPorUnidad = currentProfesoresPorUnidad
       .filter((item) => item.NumeroDeProfesores > 0)
       .map((item) => ({
-        unidad: item.UnidadAcademica, // Clave "unidad" para XAxis
-        profesores: item.NumeroDeProfesores, // Clave "profesores" para Bar
+        unidad: item.UnidadAcademica,
+        profesores: item.NumeroDeProfesores,
       }))
       .sort((a, b) => b.profesores - a.profesores);
-    console.log(
-      "DEBUG: Data for Profesores por Unidad Académica:",
-      dataProfesoresPorUnidad
-    );
     setFilteredProfesoresPorUnidad(dataProfesoresPorUnidad);
 
-    // Gráfico: Proyectos por Profesor
+    // Proyectos por Profesor
     const dataProyectosPorProfesor = currentProyectosPorProfesor
-      .filter((p) => p.NumeroDeProyectos > 0) // Quitar este filtro temporalmente para ver si el array tiene datos
+      .filter((p) => p.NumeroDeProyectos > 0)
       .map((p) => ({
         profesor: `${p.NombreAcademico} ${p.ApellidoAcademico || ""}`.trim(),
         proyectos: p.NumeroDeProyectos,
       }))
       .sort((a, b) => b.proyectos - a.proyectos);
-    // console.log("DEBUG: Data for Proyectos por Profesor:", dataProyectosPorProfesor); // Mantener para depuración
     setFilteredProyectosPorProfesor(dataProyectosPorProfesor);
 
-    // Gráfico: Proyectos por Unidad (agrupado de `currentProyectos`)
-    // Asegurarse de que `nombre_unidad_academica` exista y tenga valores para los proyectos
+    // Proyectos por Unidad
     const proyectosPorUnidadAgrupado = groupAndCount(
       currentProyectos,
       "unidad"
     );
-
     const dataProyectosPorUnidad = proyectosPorUnidadAgrupado
       .map((item) => ({
-        unidad: item.name, // Clave "unidad" para XAxis
-        proyectos: item.value, // Clave "proyectos" para Bar
+        unidad: item.name,
+        proyectos: item.value,
       }))
       .filter((d) => d.proyectos > 0)
       .sort((a, b) => b.proyectos - a.proyectos);
-    console.log(
-      "DEBUG: Data for Proyectos por Unidad (nombre_unidad_academica):",
-      dataProyectosPorUnidad
-    );
-
     setFilteredProyectosPorUnidad(dataProyectosPorUnidad);
 
     // Recalcular Indicadores Principales Compactos
-    const projectsInDashboard = proyectosData; // Estos no se filtran por ahora, son siempre los datos crudos
+    const projectsInDashboard = proyectosData;
 
     const totalMonto = projectsInDashboard.reduce(
       (sum, item) => sum + (item.monto || 0),
       0
     );
-    // Calcular escuelasFIN
     const escuelasConProfesores = new Set(
       projectsInDashboard.map((item) => item.unidad)
     ).size;
-
-    // Calcular academicosInvolucrados: Profesores únicos de `proyectosPorProfesorData`
     const academicosUnicosEnProyectos = new Set(
       proyectosPorProfesorData.map(
         (p) => `${p.NombreAcademico} ${p.ApellidoAcademico}`
@@ -530,7 +351,6 @@ export default function EstadisticasPage() {
       academicosInvolucrados: academicosUnicosEnProyectos,
     });
 
-    // Actualizar tematicas e instrumentos postulados para las listas
     const countsTematicas = groupAndCount(projectsInDashboard, "tematica")
       .sort((a, b) => b.value - a.value)
       .map((item) => item.name)
@@ -538,13 +358,20 @@ export default function EstadisticasPage() {
     setTematicasDestacadas(countsTematicas);
 
     const groupedInstruments = projectsInDashboard.reduce((acc, item) => {
-      const key = `${item.institucion || "Desconocida"}`;
+      const key = `${item.institucion || "Sin instrumento"}`;
       if (!acc[key]) {
         acc[key] = { name: key, monto: 0 };
       }
-      acc[key].monto += item.monto || 0; // Sumar montos
+      acc[key].monto += item.monto || 0;
       return acc;
     }, {});
+
+    const processedInstrumentsForPdf = Object.values(groupedInstruments)
+      .map((instrument) => ({
+        ...instrument,
+        montoFormatted: formatMM(instrument.monto),
+      }))
+      .sort((a, b) => b.monto - a.monto);
 
     const processedInstruments = Object.values(groupedInstruments)
       .map((instrument) => ({
@@ -552,126 +379,644 @@ export default function EstadisticasPage() {
         montoFormatted: formatMM(instrument.monto),
       }))
       .sort((a, b) => b.monto - a.monto)
-      .slice(0, 4);
+      .slice(0, 5);
+
+    setAllInstrumentosForPdf(processedInstrumentsForPdf);
     setInstrumentosPostulados(processedInstruments);
   }, [
     selectedEscuela,
     selectedTematica,
     selectedInstitucion,
     proyectosData,
-    profesoresPorUnidadData, // Dependencia añadida
-    proyectosPorProfesorData, // Dependencia añadida
-    academicosData, // Dependencia añadida (aunque ahora menos crítica aquí)
-    unidadesData, // Dependencia añadida
-    formatMM, // Dependencia de la función helper
+    profesoresPorUnidadData,
+    proyectosPorProfesorData,
+    unidadesData,
+    formatMM,
     selectedEstatus,
   ]);
 
-  // ** Función para generar el PDF **
+  // --- Chart.js Data & Options configurations ---
+
+  // #region Chart: Proyectos por Profesor
+  const dataChartProyectosPorProfesor = {
+    labels: filteredProyectosPorProfesor.map((d) => d.profesor),
+    datasets: [
+      {
+        label: "Proyectos",
+        data: filteredProyectosPorProfesor.map((d) => d.proyectos),
+        backgroundColor: bluePalette[0], // Using the first blue
+      },
+    ],
+  };
+
+  const optionsChartProyectosPorProfesor = {
+    responsive: true,
+    maintainAspectRatio: false, // Allows chart to fit parent div
+    indexAxis: "x", // Vertical bars
+    plugins: {
+      legend: {
+        display: false, // Hide legend if only one dataset
+      },
+      title: {
+        display: false, // Title already in HTML
+      },
+      tooltip: {
+        callbacks: {
+          label: function (context) {
+            let label = context.dataset.label || "";
+            if (label) {
+              label += ": ";
+            }
+            if (context.parsed.y !== null) {
+              label += context.parsed.y;
+            }
+            return label;
+          },
+        },
+      },
+    },
+    scales: {
+      x: {
+        title: {
+          display: false,
+        },
+        ticks: {
+          // You can use a callback to conditionally hide labels
+          autoSkip: true, // Let Chart.js decide skipping
+          maxRotation: 45, // Rotate labels for better fit
+          minRotation: 45,
+          // Custom callback to skip labels if needed, more flexible than fixed interval
+          // callback: function(val, index) {
+          //   return index % 2 === 0 ? this.getLabelForValue(val) : '';
+          // },
+          font: {
+            size: 11, // Match Recharts font size
+          },
+        },
+        grid: {
+          display: false, // Hide vertical grid lines
+        },
+      },
+      y: {
+        title: {
+          display: false,
+        },
+        beginAtZero: true,
+        ticks: {
+          precision: 0, // No decimals for count
+        },
+        grid: {
+          color: "rgba(0, 0, 0, 0.05)", // Light horizontal grid
+        },
+      },
+    },
+  };
+  // #endregion
+
+  // #region Chart: Proyectos por Unidad Académica
+  const dataChartProyectosPorUnidad = {
+    labels: filteredProyectosPorUnidad.map((d) => d.unidad),
+    datasets: [
+      {
+        label: "Proyectos",
+        data: filteredProyectosPorUnidad.map((d) => d.proyectos),
+        backgroundColor: bluePalette[2], // Different shade of blue
+      },
+    ],
+  };
+
+  const optionsChartProyectosPorUnidad = {
+    responsive: true,
+    maintainAspectRatio: false,
+    indexAxis: "x",
+    plugins: {
+      legend: {
+        display: false,
+      },
+      title: {
+        display: false,
+      },
+      tooltip: {
+        callbacks: {
+          label: function (context) {
+            let label = context.dataset.label || "";
+            if (label) {
+              label += ": ";
+            }
+            if (context.parsed.y !== null) {
+              label += context.parsed.y;
+            }
+            return label;
+          },
+        },
+      },
+    },
+    scales: {
+      x: {
+        ticks: {
+          autoSkip: true,
+          maxRotation: 45,
+          minRotation: 45,
+          font: {
+            size: 11,
+          },
+        },
+        grid: {
+          display: false,
+        },
+      },
+      y: {
+        beginAtZero: true,
+        ticks: {
+          precision: 0,
+        },
+        grid: {
+          color: "rgba(0, 0, 0, 0.05)",
+        },
+      },
+    },
+  };
+  // #endregion
+
+  // #region Chart: Profesores por Unidad Académica
+  const dataChartProfesoresPorUnidad = {
+    labels: filteredProfesoresPorUnidad.map((d) => d.unidad),
+    datasets: [
+      {
+        label: "Profesores",
+        data: filteredProfesoresPorUnidad.map((d) => d.profesores),
+        backgroundColor: bluePalette[0], // Primary blue
+      },
+    ],
+  };
+
+  const optionsChartProfesoresPorUnidad = {
+    responsive: true,
+    maintainAspectRatio: false,
+    indexAxis: "x",
+    plugins: {
+      legend: {
+        display: false,
+      },
+      title: {
+        display: false,
+      },
+      tooltip: {
+        callbacks: {
+          label: function (context) {
+            let label = context.dataset.label || "";
+            if (label) {
+              label += ": ";
+            }
+            if (context.parsed.y !== null) {
+              label += context.parsed.y;
+            }
+            return label;
+          },
+        },
+      },
+    },
+    scales: {
+      x: {
+        ticks: {
+          autoSkip: true,
+          maxRotation: 45,
+          minRotation: 45,
+          font: {
+            size: 11,
+          },
+        },
+        grid: {
+          display: false,
+        },
+      },
+      y: {
+        beginAtZero: true,
+        ticks: {
+          precision: 0,
+        },
+        grid: {
+          color: "rgba(0, 0, 0, 0.05)",
+        },
+      },
+    },
+  };
+  // #endregion
+
+  // #region Chart: Proyectos por Temática (Horizontal Bar Chart)
+  const dataChartProyectosPorTematica = {
+    labels: filteredProyectosPorTematica.map((d) => d.name),
+    datasets: [
+      {
+        label: "Proyectos",
+        data: filteredProyectosPorTematica.map((d) => d.value),
+        backgroundColor: bluePalette[3], // Accent blue
+      },
+    ],
+  };
+
+  const optionsChartProyectosPorTematica = {
+    responsive: true,
+    maintainAspectRatio: false,
+    indexAxis: "y", // Horizontal bars
+    plugins: {
+      legend: {
+        display: false,
+      },
+      title: {
+        display: false,
+      },
+      tooltip: {
+        callbacks: {
+          label: function (context) {
+            let label = context.dataset.label || "";
+            if (label) {
+              label += ": ";
+            }
+            if (context.parsed.x !== null) {
+              label += context.parsed.x; // For horizontal bar, value is on x-axis
+            }
+            return label;
+          },
+        },
+      },
+    },
+    scales: {
+      x: {
+        beginAtZero: true,
+        ticks: {
+          precision: 0,
+        },
+        grid: {
+          color: "rgba(0, 0, 0, 0.05)",
+        },
+      },
+      y: {
+        ticks: {
+          autoSkip: true, // Let Chart.js decide skipping
+          font: {
+            size: 12,
+          },
+        },
+        grid: {
+          display: false,
+        },
+      },
+    },
+  };
+  // #endregion
+
+  // #region Chart: Proyectos por Tipo de Fondo (Horizontal Bar Chart)
+  const dataChartProyectosPorInstitucion = {
+    labels: filteredProyectosPorInstitucion.map((d) => d.name),
+    datasets: [
+      {
+        label: "Proyectos",
+        data: filteredProyectosPorInstitucion.map((d) => d.value),
+        backgroundColor: bluePalette[6],
+      },
+    ],
+  };
+
+  const optionsChartProyectosPorInstitucion = {
+    responsive: true,
+    maintainAspectRatio: false,
+    indexAxis: "y", // Horizontal bars
+    plugins: {
+      legend: {
+        display: false,
+      },
+      title: {
+        display: false,
+      },
+      tooltip: {
+        callbacks: {
+          label: function (context) {
+            let label = context.dataset.label || "";
+            if (label) {
+              label += ": ";
+            }
+            if (context.parsed.x !== null) {
+              label += context.parsed.x;
+            }
+            return label;
+          },
+        },
+      },
+    },
+    scales: {
+      x: {
+        beginAtZero: true,
+        ticks: {
+          precision: 0,
+        },
+        grid: {
+          color: "rgba(0, 0, 0, 0.05)",
+        },
+      },
+      y: {
+        ticks: {
+          autoSkip: true,
+          font: {
+            size: 12,
+          },
+        },
+        grid: {
+          display: false,
+        },
+      },
+    },
+  };
+  // #endregion
+
+  // Función para generar el PDF
   const generarPDF = async () => {
     setLoadingExportPDF(true);
     try {
-      const input = estadisticasContentRef.current; // Capturamos el contenedor principal
+      const doc = new jsPDF("p", "mm", "a4"); // Instancia de jsPDF
+      const pdfWidth = doc.internal.pageSize.getWidth();
+      const pdfHeight = doc.internal.pageSize.getHeight();
+      const margin = 15;
+      const contentWidth = pdfWidth - margin * 2;
 
+      // --- Página de los Gráficos (Imagen) ---
+      const input = estadisticasContentRef.current;
       if (!input) {
         console.error("No se encontró el elemento para exportar a PDF.");
+        setLoadingExportPDF(false);
         return;
       }
 
-      // Calcular las dimensiones de la página A4 en mm
-      const pdf = new jsPDF("p", "mm", "a4");
-      const pdfWidth = pdf.internal.pageSize.getWidth(); // Ancho real de la página en mm (aprox. 210)
-      const pdfHeight = pdf.internal.pageSize.getHeight(); // Alto real de la página en mm (aprox. 297)
-
-      // ** DEFINIR MÁRGENES (en mm) **
-      const margin = 15; // Margen de 15mm en todos los lados
-      const contentWidth = pdfWidth - margin * 2; // Ancho disponible para el contenido
-      const contentHeight = pdfHeight - margin * 2; // Alto disponible para el contenido
-
-      // Opciones para html2canvas para asegurar una buena calidad
-      // Es posible que necesites ajustar windowWidth y windowHeight para asegurar
-      // que html2canvas capture todo el scrollHeight/scrollWidth del elemento.
-      // Esto es crucial si tu contenido puede tener scroll dentro del ref.
       const canvas = await html2canvas(input, {
-        scale: 2, // Aumenta la resolución para mejor calidad en PDF (renderiza el doble de grande)
-        useCORS: true, // Importante si tienes imágenes de diferentes dominios
-        logging: true, // Para ver logs de html2canvas en consola (quitar en prod)
-        windowWidth: input.scrollWidth, // Captura el ancho total del contenido
-        windowHeight: input.scrollHeight, // Captura el alto total del contenido
+        scale: 2,
+        useCORS: true,
+        logging: true,
+        windowWidth: input.scrollWidth,
+        windowHeight: input.scrollHeight,
       });
-
       const imgData = canvas.toDataURL("image/jpeg", 0.8);
 
-      // Calcular las dimensiones de la imagen para que quepa dentro de los márgenes
-      let imgRatio = canvas.width / canvas.height; // Relación de aspecto del contenido capturado
-      let imgDisplayWidth = contentWidth; // Ancho inicial para la imagen (será el ancho del contenido)
-      let imgDisplayHeight = imgDisplayWidth / imgRatio; // Alto proporcional a ese ancho
+      let imgRatio = canvas.width / canvas.height;
+      let imgDisplayWidth = contentWidth;
+      let imgDisplayHeight = imgDisplayWidth / imgRatio;
 
-      // Si la imagen, a su ancho completo, es más alta que el espacio disponible en la página,
-      // entonces la ajustamos por la altura, manteniendo la proporción.
-      if (imgDisplayHeight > contentHeight) {
-        imgDisplayHeight = contentHeight;
+      if (imgDisplayHeight > pdfHeight - margin * 2 - 30) {
+        imgDisplayHeight = pdfHeight - margin * 2 - 30;
         imgDisplayWidth = imgDisplayHeight * imgRatio;
       }
 
-      let heightLeft = imgDisplayHeight;
-      let position = margin; // Inicia la posición Y en el margen superior
+      let yPos = margin + 30; // Inicia después del título y la fecha
 
-      // Coordenada X inicial para centrar la imagen horizontalmente
-      const startX = margin + (contentWidth - imgDisplayWidth) / 2;
-
-      // Añadir el título y la fecha
-      pdf.setFontSize(12); // Tamaño para el título
-      pdf.text("Estadísticas del Dashboard", pdfWidth / 2, margin + 10, {
+      doc.setFontSize(12);
+      doc.text("Estadísticas del Dashboard", pdfWidth / 2, margin + 10, {
         align: "center",
-      }); // Centra el títulof
-
-      pdf.setFontSize(10); // Tamaño para la fecha
+      });
+      doc.setFontSize(10);
       const today = new Date();
       const year = today.getFullYear();
       const month = String(today.getMonth() + 1).padStart(2, "0");
       const day = String(today.getDate()).padStart(2, "0");
       const dateString = `${day}-${month}-${year}`;
-      pdf.text(
+      doc.text(
         `Fecha de Exportación: ${dateString}`,
         pdfWidth / 2,
         margin + 20,
         { align: "center" }
-      ); // Centra la fecha
+      );
 
-      // Ajustar la posición inicial de la imagen para dejar espacio al título y la fecha
-      position = margin + 30; // 10 (margen inicial) + 22 (título) + 8 (espacio) + 12 (fecha) + 10 (espacio) = ~62mm de offset
-
-      pdf.addImage(
+      const startX = margin + (contentWidth - imgDisplayWidth) / 2;
+      doc.addImage(
         imgData,
         "PNG",
         startX,
-        position,
+        yPos,
         imgDisplayWidth,
         imgDisplayHeight
       );
-      heightLeft -= pdfHeight - position; // Restar el espacio ya ocupado en la primera página
 
-      // Si el contenido es más alto que una página, añadir más páginas
-      while (heightLeft > 0) {
-        position = -(imgDisplayHeight - (heightLeft + (pdfHeight - margin))); // Calcula la posición Y para el "corte" de la imagen en la nueva página
-        pdf.addPage();
-        pdf.addImage(
-          imgData,
-          "PNG",
-          startX,
-          position,
-          imgDisplayWidth,
-          imgDisplayHeight
+      // --- Sección de Datos Tabulares (Nuevas Páginas) ---
+      doc.addPage(); // Añadir una nueva página para las tablas
+
+      let currentY = margin + 10; // Posición Y para el contenido en la nueva página
+
+      // Función auxiliar para añadir títulos de sección y verificar si cabe la tabla
+      const addSectionTitle = (titleText) => {
+        if (currentY + 20 > pdfHeight - margin) {
+          // Margen de seguridad para el título
+          doc.addPage();
+          currentY = margin + 10;
+        }
+        doc.setFontSize(14);
+        doc.setTextColor(46, 92, 138); // Color azul similar al de la paleta
+        doc.text(titleText, margin, currentY);
+        doc.setTextColor(0); // Resetear a negro
+        currentY += 10; // Espacio después del título
+      };
+
+      // 1. Tabla de Proyectos por Profesor
+      addSectionTitle("Datos: Proyectos por Profesor");
+      if (filteredProyectosPorProfesor.length > 0) {
+        const headers = [["Profesor", "Proyectos"]];
+        const body = filteredProyectosPorProfesor.map((item) => [
+          item.profesor,
+          item.proyectos,
+        ]);
+        autoTable(doc, {
+          // <-- CORRECTO: Llamada a autoTable directamente
+          startY: currentY,
+          head: headers,
+          body: body,
+          margin: { left: margin, right: margin },
+          styles: { fontSize: 8, cellPadding: 2, overflow: "linebreak" },
+          headStyles: {
+            fillColor: [46, 92, 138],
+            textColor: 255,
+            fontStyle: "bold",
+          },
+          didDrawPage: (data) => {
+            currentY = data.cursor.y + 10;
+          },
+        });
+      } else {
+        doc.setFontSize(10);
+        doc.text("No hay datos de proyectos por profesor.", margin, currentY);
+        currentY += 10;
+      }
+      currentY += 10;
+
+      // 2. Tabla de Proyectos por Unidad Académica
+      addSectionTitle("Datos: Proyectos por Unidad Académica");
+      if (filteredProyectosPorUnidad.length > 0) {
+        const headers = [["Unidad Académica", "Proyectos"]];
+        const body = filteredProyectosPorUnidad.map((item) => [
+          item.unidad,
+          item.proyectos,
+        ]);
+        autoTable(doc, {
+          // <-- CORRECTO: Llamada a autoTable directamente
+          startY: currentY,
+          head: headers,
+          body: body,
+          margin: { left: margin, right: margin },
+          styles: { fontSize: 8, cellPadding: 2, overflow: "linebreak" },
+          headStyles: {
+            fillColor: [93, 149, 200],
+            textColor: 255,
+            fontStyle: "bold",
+          },
+          didDrawPage: (data) => {
+            currentY = data.cursor.y + 10;
+          },
+        });
+      } else {
+        doc.setFontSize(10);
+        doc.text(
+          "No hay datos de proyectos por unidad académica.",
+          margin,
+          currentY
         );
-        heightLeft -= pdfHeight - margin;
+        currentY += 10;
+      }
+      currentY += 10;
+
+      // 3. Tabla de Profesores por Unidad Académica
+      addSectionTitle("Datos: Profesores por Unidad Académica");
+      if (filteredProfesoresPorUnidad.length > 0) {
+        const headers = [["Unidad Académica", "Profesores"]];
+        const body = filteredProfesoresPorUnidad.map((item) => [
+          item.unidad,
+          item.profesores,
+        ]);
+        autoTable(doc, {
+          // <-- CORRECTO: Llamada a autoTable directamente
+          startY: currentY,
+          head: headers,
+          body: body,
+          margin: { left: margin, right: margin },
+          styles: { fontSize: 8, cellPadding: 2, overflow: "linebreak" },
+          headStyles: {
+            fillColor: [46, 92, 138],
+            textColor: 255,
+            fontStyle: "bold",
+          },
+          didDrawPage: (data) => {
+            currentY = data.cursor.y + 10;
+          },
+        });
+      } else {
+        doc.setFontSize(10);
+        doc.text(
+          "No hay datos de profesores por unidad académica.",
+          margin,
+          currentY
+        );
+        currentY += 10;
+      }
+      currentY += 10;
+
+      // 4. Tabla de Proyectos por Temática
+      addSectionTitle("Datos: Proyectos por Temática");
+      if (filteredProyectosPorTematica.length > 0) {
+        const headers = [["Temática", "Proyectos"]];
+        const body = filteredProyectosPorTematica.map((item) => [
+          item.name,
+          item.value,
+        ]);
+        autoTable(doc, {
+          // <-- CORRECTO: Llamada a autoTable directamente
+          startY: currentY,
+          head: headers,
+          body: body,
+          margin: { left: margin, right: margin },
+          styles: { fontSize: 8, cellPadding: 2, overflow: "linebreak" },
+          headStyles: {
+            fillColor: [59, 130, 246],
+            textColor: 255,
+            fontStyle: "bold",
+          },
+          didDrawPage: (data) => {
+            currentY = data.cursor.y + 10;
+          },
+        });
+      } else {
+        doc.setFontSize(10);
+        doc.text("No hay datos de proyectos por temática.", margin, currentY);
+        currentY += 10;
+      }
+      currentY += 10;
+
+      // 5. Tabla de Proyectos por Tipo de Fondo (Refleja el Bar Chart SIMPLE)
+      // Usaremos filteredProyectosPorInstitucion directamente
+      addSectionTitle("Datos: Proyectos por Tipo de Fondo");
+      if (filteredProyectosPorInstitucion.length > 0) {
+        const headers = [["Tipo de Fondo", "Proyectos"]];
+        const body = filteredProyectosPorInstitucion.map((item) => [
+          item.name,
+          item.value,
+        ]);
+        autoTable(doc, {
+          // <-- CORRECTO: Llamada a autoTable directamente
+          startY: currentY,
+          head: headers,
+          body: body,
+          margin: { left: margin, right: margin },
+          styles: { fontSize: 8, cellPadding: 2, overflow: "linebreak" },
+          headStyles: {
+            fillColor: [30, 58, 92],
+            textColor: 255,
+            fontStyle: "bold",
+          },
+          didDrawPage: (data) => {
+            currentY = data.cursor.y + 10;
+          },
+        });
+      } else {
+        doc.setFontSize(10);
+        doc.text(
+          "No hay datos de proyectos por tipo de fondo.",
+          margin,
+          currentY
+        );
+        currentY += 10;
+      }
+      currentY += 10;
+
+      // 6. Tabla de Instrumentos Postulados (de la lista compacta)
+      addSectionTitle("Datos: Instrumentos Postulados (Todos)");
+      if (allInstrumentosForPdf.length > 0) {
+        const headers = [["Instrumento", "Monto Formulados"]];
+        const body = allInstrumentosForPdf.map((item) => [
+          item.name,
+          item.montoFormatted,
+        ]);
+        autoTable(doc, {
+          // <-- CORRECTO: Llamada a autoTable directamente
+          startY: currentY,
+          head: headers,
+          body: body,
+          margin: { left: margin, right: margin },
+          styles: { fontSize: 8, cellPadding: 2, overflow: "linebreak" },
+          headStyles: {
+            fillColor: [74, 122, 159],
+            textColor: 255,
+            fontStyle: "bold",
+          },
+          didDrawPage: (data) => {
+            currentY = data.cursor.y + 10;
+          },
+        });
+      } else {
+        doc.setFontSize(10);
+        doc.text(
+          "No hay instrumentos postulados disponibles.",
+          margin,
+          currentY
+        );
+        currentY += 10;
       }
 
-      // --- CAMBIOS AQUI: GENERAR EL NOMBRE DEL ARCHIVO CON FECHA EN FORMATO DD-MM-YYYY ---
-      // Re-utilizamos la lógica de fecha
       const filename = `estadisticas_dashboard_${day}-${month}-${year}.pdf`;
-      pdf.save(filename); // Guarda el PDF con el nombre generado
-      // --- FIN CAMBIOS ---
+      doc.save(filename);
     } catch (error) {
       console.error("Error al generar el PDF:", error);
       setErrorLocal("Error al generar el PDF. Intente de nuevo más tarde.");
@@ -917,8 +1262,11 @@ export default function EstadisticasPage() {
               {/* Fin del grid de indicadores pequeños */}
               {/* Temáticas Destacadas - Tarjeta Compacta */}
               <div className="bg-[#e1edfd]  items-center  rounded-xl p-6 text-gray-900 shadow-lg border border-gray-100">
-                <h3 className="text-lg text-center font-semibold mb-4">
+                <h3 className="text-lg text-center font-semibold">
                   Temáticas Destacadas
+                </h3>
+                <h3 className="text-sm text-gray-500 text-center font-semibold mb-4">
+                  Top 6 (por Proyecto)
                 </h3>
                 <div className="flex flex-col gap-2">
                   {tematicasDestacadas.map((tematica, index) => (
@@ -933,8 +1281,11 @@ export default function EstadisticasPage() {
               </div>
               {/* Instrumentos Postulados - Tarjeta Compacta */}
               <div className="bg-[#e1edfd]  rounded-xl p-6 text-gray-900 shadow-lg border border-gray-100">
-                <h3 className="text-lg  text-center font-semibold mb-4">
+                <h3 className="text-lg  text-center font-semibold">
                   Instrumentos Postulados
+                </h3>
+                <h3 className="text-sm text-gray-500 text-center font-semibold mb-4">
+                  Top 5 (por Monto)
                 </h3>
                 <div className="flex flex-col ">
                   {instrumentosPostulados.map((instrumento, index) => (
@@ -960,31 +1311,20 @@ export default function EstadisticasPage() {
                 <h4 className="text-lg font-semibold text-gray-900">
                   Proyectos por Profesor
                 </h4>
-                <h4 className="text-s text-gray-500 mb-4">
-                  Cantidad de proyectos en los que ha participado cada profesor.
+                <h4 className="text-sm text-gray-600">
+                  <strong>Datos que muestra:</strong> Cantidad de proyectos en
+                  los que ha participado cada profesor.
+                </h4>
+                <h4 className="text-sm text-gray-600 mb-4">
+                  <strong>Insight principal:</strong> Identificar a los
+                  profesores más activos o con mayor participación en proyectos.
                 </h4>
                 <div className="h-80 flex items-center justify-center">
                   {filteredProyectosPorProfesor.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={filteredProyectosPorProfesor}
-                        margin={{ top: 10, right: 30, bottom: 80, left: 20 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis
-                          allowDecimals={false}
-                          dataKey="profesor"
-                          angle={-45}
-                          textAnchor="end"
-                          height={120} // Más altura para las etiquetas rotadas
-                          fontSize={11} // Reducir un poco el tamaño de la fuente
-                          interval={2}
-                        />
-                        <YAxis allowDecimals={false} />
-                        <Tooltip />
-                        <Bar dataKey="proyectos" fill="#7facea" />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <Bar
+                      data={dataChartProyectosPorProfesor}
+                      options={optionsChartProyectosPorProfesor}
+                    />
                   ) : (
                     <p className="text-gray-500">
                       No hay datos de proyectos por profesor para la selección
@@ -993,39 +1333,26 @@ export default function EstadisticasPage() {
                   )}
                 </div>
               </div>
-              {/* Proyectos por Unidad (Gráfico de Barras - Ahora integrado en la tercera columna) */}
+              {/* Proyectos por Unidad (Gráfico de Barras) */}
               <div className="bg-white rounded-lg shadow-lg p-6">
                 {" "}
-                {/* Sin mb-8 para que el space-y-8 lo controle */}
                 <h4 className="text-lg font-semibold text-gray-900">
                   Proyectos por Unidad Académica
                 </h4>
-                <h4 className="text-s text-gray-500 mb-4">
-                  Número total de proyectos por cada unidad académica de los
-                  profesores involucrados.
+                <h4 className="text-sm text-gray-600">
+                  <strong>Datos que muestra:</strong> Número total de proyectos
+                  por cada unidad académica.
+                </h4>
+                <h4 className="text-sm text-gray-600 mb-4">
+                  <strong>Insight principal:</strong> Identificar qué unidades
+                  son más productivas en términos de proyectos.
                 </h4>
                 <div className="h-80 flex items-center justify-center">
                   {filteredProyectosPorUnidad.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={filteredProyectosPorUnidad}
-                        margin={{ top: 20, right: 30, bottom: 80, left: 20 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis
-                          allowDecimals={false}
-                          dataKey="unidad"
-                          angle={-45}
-                          textAnchor="end"
-                          height={120} // Más altura para las etiquetas rotadas
-                          fontSize={11} // Reducir un poco el tamaño de la fuente
-                          interval={0}
-                        />
-                        <YAxis allowDecimals={false} />
-                        <Tooltip />
-                        <Bar dataKey="proyectos" fill="#7CA3CB" />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <Bar
+                      data={dataChartProyectosPorUnidad}
+                      options={optionsChartProyectosPorUnidad}
+                    />
                   ) : (
                     <p className="text-gray-500">
                       No hay datos de proyectos por unidad para la selección
@@ -1039,31 +1366,20 @@ export default function EstadisticasPage() {
                 <h4 className="text-lg font-semibold text-gray-900">
                   Profesores por Unidad Académica
                 </h4>
-                <h4 className="text-s text-gray-500 mb-4">
-                  Cantidad de profesores agrupados por unidad académica.
+                <h4 className="text-sm text-gray-600">
+                  <strong>Datos que muestra:</strong> Cantidad de profesores
+                  agrupados por unidad académica.
+                </h4>
+                <h4 className="text-sm text-gray-600 mb-4">
+                  <strong>Insight principal:</strong> Mostrar la distribución de
+                  los académicos en las diferentes unidades.
                 </h4>
                 <div className="h-80 flex items-center justify-center">
                   {filteredProfesoresPorUnidad.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={filteredProfesoresPorUnidad}
-                        margin={{ top: 40, right: 30, bottom: 80, left: 20 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis
-                          allowDecimals={false}
-                          dataKey="unidad"
-                          angle={-45}
-                          textAnchor="end"
-                          height={120} // Más altura para las etiquetas rotadas
-                          fontSize={11} // Reducir un poco el tamaño de la fuente
-                          interval={0}
-                        />
-                        <YAxis allowDecimals={false} />
-                        <Tooltip />
-                        <Bar dataKey="profesores" fill="#2E5C8A" />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <Bar
+                      data={dataChartProfesoresPorUnidad}
+                      options={optionsChartProfesoresPorUnidad}
+                    />
                   ) : (
                     <p className="text-gray-500">
                       No hay datos de profesores para la selección actual.
@@ -1073,7 +1389,7 @@ export default function EstadisticasPage() {
               </div>
             </div>{" "}
             {/* Fin de la COLUMNA 2 */}
-            {/* COLUMNA 3: Gráficos de Torta (Proyectos por Temática, Proyectos por Convocatoria, y Proyectos por Unidad) */}
+            {/* COLUMNA 3: Gráficos de Barras (Proyectos por Temática, Proyectos por Tipo de Fondo) */}
             <div className="lg:col-span-1 space-y-8">
               {" "}
               {/* Ocupa 1/3 del ancho, y deja espacio entre gráficos */}
@@ -1082,40 +1398,20 @@ export default function EstadisticasPage() {
                 <h4 className="text-lg font-semibold text-gray-900">
                   Proyectos por Temática
                 </h4>
-                <h4 className="text-s text-gray-500 mb-4">
-                  Distribución de los proyectos según su área temática
-                  principal.
+                <h4 className="text-sm text-gray-600">
+                  <strong>Datos que muestra:</strong> Distribución de los
+                  proyectos según su área temática principal.
+                </h4>
+                <h4 className="text-sm text-gray-600 mb-4">
+                  <strong>Insight principal:</strong> Identificar las temáticas
+                  más prevalentes o con mayor inversión/actividad.
                 </h4>
                 <div className="h-80 flex items-center justify-center">
                   {filteredProyectosPorTematica.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={filteredProyectosPorTematica}
-                        layout="vertical"
-                        margin={{
-                          top: 20,
-                          right: 30,
-                          left: 100, // Ajusta este valor: Mayor para etiquetas más largas
-                          bottom: 5,
-                        }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis type="number" allowDecimals={false} />{" "}
-                        {/* Eje X es numérico */}
-                        <YAxis
-                          type="category"
-                          dataKey="name" // `name` de { name, value } del groupAndCount
-                          textAnchor="end" // Alinea el texto a la derecha (fin)
-                          width={100} // Aumenta el ancho del área de la etiqueta Y
-                          fontSize={12}
-                          tickFormatter={(value) => `${value}`}
-                          interval={2}
-                        />
-                        <Tooltip content={<CustomTooltip />} />
-                        <Bar dataKey="value" fill="#457dca" />{" "}
-                        {/* `value` de { name, value } del groupAndCount */}
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <Bar
+                      data={dataChartProyectosPorTematica}
+                      options={optionsChartProyectosPorTematica}
+                    />
                   ) : (
                     <p className="text-gray-500">
                       No hay datos de proyectos por temática para la selección
@@ -1124,53 +1420,34 @@ export default function EstadisticasPage() {
                   )}
                 </div>
               </div>
-              {/* Proyectos por Convocatoria (Pie Chart) */}
+              {/* Proyectos por Tipo de Fondo (Bar Chart horizontal) */}
               <div className="bg-white rounded-lg shadow-lg p-6">
                 <h4 className="text-lg font-semibold text-gray-900">
                   Proyectos por Tipo de Fondo
                 </h4>
-                <h4 className="text-s text-gray-500 mb-4">
-                  Cantidad de proyectos según la institución o instrumento de
-                  financiamiento.
+                <h4 className="text-sm text-gray-600">
+                  <strong>Datos que muestra:</strong> Cantidad de proyectos
+                  según la institución o instrumento de financiamiento.
+                </h4>
+                <h4 className="text-sm text-gray-600 mb-4">
+                  <strong>Insight principal:</strong> Entender qué instrumentos
+                  son más utilizados.
                 </h4>
                 <div className="h-80 flex items-center justify-center">
                   {filteredProyectosPorInstitucion.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={filteredProyectosPorInstitucion}
-                        layout="vertical" // Gráfico de barras horizontal
-                        margin={{
-                          top: 20,
-                          right: 30,
-                          left: 100, // Espacio para las etiquetas del eje Y
-                          bottom: 5,
-                        }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis type="number" allowDecimals={false} />
-                        <YAxis
-                          type="category"
-                          dataKey="name"
-                          textAnchor="end"
-                          width={100} // Ancho para las etiquetas
-                          fontSize={12}
-                          interval={0} // Mantener todas las etiquetas para este gráfico, o ajusta a 1 o 2 si se superponen mucho
-                        />
-                        <Tooltip content={<CustomTooltip />} />{" "}
-                        {/* Reutilizar el CustomTooltip */}
-                        <Bar dataKey="value" fill="#77C3ED" />{" "}
-                        {/* Usar un color consistente de tu paleta */}
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <Bar
+                      data={dataChartProyectosPorInstitucion}
+                      options={optionsChartProyectosPorInstitucion}
+                    />
                   ) : (
                     <p className="text-gray-500">
-                      No hay datos de proyectos por institución para la
+                      No hay datos de proyectos por tipo de fondo para la
                       selección actual.
                     </p>
                   )}
                 </div>
               </div>
-            </div>{" "}
+            </div>
             {/* Fin de la COLUMNA 3 */}
           </div>
         </div>

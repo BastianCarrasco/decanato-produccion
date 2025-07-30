@@ -11,6 +11,16 @@ import {
   Dna,
   BatteryCharging,
   CircleDollarSign,
+  GraduationCap,
+  Scale,
+  Droplet,
+  Plug,
+  HeartPulse,
+  Recycle,
+  Utensils,
+  Network,
+  Atom,
+  RadioTower,
 } from "lucide-react";
 
 // Importaciones de logos (estas también podrían moverse a un archivo de constantes compartidas)
@@ -60,38 +70,59 @@ export const getStatusBadge = (estatus) => {
 
 export const getThematicBadge = (tematica) => {
   const baseClasses =
-    "flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium";
-  let icon = <Tag className="h-4 w-4" />;
-  let colorClasses = "bg-gray-100 text-gray-700";
+    "flex items-center gap-1 px-3 py-2 rounded-full text-sm font-medium";
+  const iconClass = "h-6 w-6";
+  let icon;
+  let colorClasses = "bg-sky-200 text-gray-800";
 
   switch (tematica) {
     case "Almacenamiento Energía":
-      icon = <Zap className="h-4 w-4" />;
-      colorClasses = "bg-teal-100 text-teal-700";
+      icon = <Zap />;
       break;
     case "Hidrógeno":
-      icon = <FlaskRound className="h-6 w-6" />;
-      colorClasses = "bg-cyan-100 text-cyan-700";
+      icon = <FlaskRound />;
       break;
     case "Contaminación Lumínica":
-      icon = <Lightbulb className="h-4 w-4" />;
-      colorClasses = "bg-yellow-100 text-yellow-700";
+      icon = <Lightbulb />;
       break;
     case "Minería":
-      icon = <Pickaxe className="h-4 w-4" />;
-      colorClasses = "bg-orange-100 text-orange-700";
+      icon = <Pickaxe />;
+      break;
+    case "Agua":
+      icon = <Droplet />;
+      break;
+    case "Energía":
+      icon = <Plug />;
+      break;
+    case "LegalTech":
+      icon = <Scale />;
+      break;
+    case "Salud":
+      icon = <HeartPulse />;
+      break;
+    case "Economía Circular":
+      icon = <Recycle />;
+      break;
+    case "Alimentos":
+      icon = <Utensils />;
+      break;
+    case "Interdisciplina":
+      icon = <Network />;
+      break;
+    case "STEM":
+      icon = <Atom />;
+      break;
+    case "Telecomunicaciones":
+      icon = <RadioTower />;
       break;
     case "Biotecnología":
-      icon = <Dna className="h-4 w-4" />;
-      colorClasses = "bg-purple-100 text-purple-700";
+      icon = <Dna />;
       break;
     case "Litio":
-      icon = <BatteryCharging className="h-4 w-4" />;
-      colorClasses = "bg-slate-100 text-slate-700";
+      icon = <BatteryCharging />;
       break;
     default:
-      icon = <Tag className="h-4 w-4" />;
-      colorClasses = "bg-gray-100 text-gray-700";
+      icon = <Tag />;
       break;
   }
   return (
@@ -127,7 +158,12 @@ export const renderInstitucionLogo = (nombreInstitucion) => {
   return null;
 };
 
-function ProjectCard({ project, academicosDelProyecto, onClick }) {
+function ProjectCard({
+  project,
+  academicosDelProyecto,
+  estudiantesDelProyecto,
+  onClick,
+}) {
   // Added onClick prop
 
   const formatDateShort = (dateString) => {
@@ -154,7 +190,14 @@ function ProjectCard({ project, academicosDelProyecto, onClick }) {
       ? academicosDelProyecto.profesores
           .map((p) => p.nombre_completo)
           .join(", ")
-      : "N/A";
+      : "Sin académicos involucrados";
+
+  const estudiantesNames =
+    estudiantesDelProyecto && Array.isArray(estudiantesDelProyecto)
+      ? estudiantesDelProyecto
+          .map((e) => `${e.nombre} ${e.a_paterno || ""}`.trim())
+          .join(", ")
+      : "";
 
   return (
     <Card
@@ -191,6 +234,7 @@ function ProjectCard({ project, academicosDelProyecto, onClick }) {
             {/* Unidad responsable */}
           </div>
         </div>
+
         {/* Monto y Tipo de Apoyo */}
         <div className="flex items-center text-gray-700 text-sm mb-2">
           <CircleDollarSign className="h-4 w-4 mr-2 text-gray-500" />
@@ -199,11 +243,21 @@ function ProjectCard({ project, academicosDelProyecto, onClick }) {
               ${project.monto.toLocaleString("es-CL")}
             </p>
             <p className="text-xs text-gray-500">
-              {project.apoyo || "Sin información"} (
+              Apoyo {project.apoyo || "Sin información"} (
               {project.detalle_apoyo || "Sin información"})
             </p>
           </div>
         </div>
+
+        {estudiantesNames.length > 0 && ( // <--- CAMBIO CLAVE: Condición con .length
+          <div className="flex items-center text-gray-700 text-sm mb-2">
+            <GraduationCap className="h-4 w-4 mr-2 text-gray-500" />
+            <div className="flex flex-col">
+              <p className="font-medium text-gray-900">{estudiantesNames}</p>
+              <p className="text-xs text-gray-500">Estudiantes Involucrados</p>
+            </div>
+          </div>
+        )}
         {/* **** Nuevo contenedor Flexbox para la Fecha y el Badge al final **** */}
         <div className="flex items-center justify-between mt-auto pt-4 border-t border-gray-100">
           {" "}

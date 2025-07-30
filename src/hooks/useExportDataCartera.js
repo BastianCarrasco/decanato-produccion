@@ -34,6 +34,7 @@ export function useExportData() {
     { key: "nombre_convo", label: "Convocatoria" },
     { key: "comentarios", label: "Comentarios" },
     { key: "academicos", label: "Académicos" },
+    { key: "estudiantes", label: "Estudiantes" },
   ];
 
   // Placeholder para la imagen del logo en Base64.
@@ -163,7 +164,15 @@ export function useExportData() {
             valor =
               Array.isArray(p.academicos) && p.academicos.length > 0
                 ? p.academicos.map((a) => a.nombre_completo).join(", ")
-                : "-";
+                : "Sin académicos involucrados"; // <--- CAMBIO AQUÍ para PDF
+          } else if (col.key === "estudiantes") {
+            // <--- NUEVA LÓGICA PARA ESTUDIANTES EN PDF
+            valor =
+              Array.isArray(p.estudiantes) && p.estudiantes.length > 0
+                ? p.estudiantes
+                    .map((e) => `${e.nombre} ${e.a_paterno || ""}`.trim())
+                    .join(", ")
+                : "Sin estudiantes involucrados";
           } else {
             valor = p[col.key] ?? "-";
           }
@@ -187,7 +196,7 @@ export function useExportData() {
         if (y + currentProjectHeight > doc.internal.pageSize.height - margin) {
           drawFooter(doc, doc.internal.getNumberOfPages());
           doc.addPage();
-          drawHeader(doc, fecha, doc.internal.getNumberOfPages());
+          drawHeader(doc, doc.internal.getNumberOfPages()); // Dibuja header en la nueva página
           y = headerHeight + margin;
         }
 
@@ -213,7 +222,15 @@ export function useExportData() {
             valor =
               Array.isArray(p.academicos) && p.academicos.length > 0
                 ? p.academicos.map((a) => a.nombre_completo).join(", ")
-                : "-";
+                : "Sin académicos involucrados"; // <--- CAMBIO AQUÍ para PDF
+          } else if (col.key === "estudiantes") {
+            // <--- NUEVA LÓGICA PARA ESTUDIANTES EN PDF
+            valor =
+              Array.isArray(p.estudiantes) && p.estudiantes.length > 0
+                ? p.estudiantes
+                    .map((e) => `${e.nombre} ${e.a_paterno || ""}`.trim())
+                    .join(", ")
+                : "Sin estudiantes involucrados";
           } else {
             valor = p[col.key] ?? "-";
           }
@@ -277,7 +294,15 @@ export function useExportData() {
             row[col.label] =
               Array.isArray(p.academicos) && p.academicos.length > 0
                 ? p.academicos.map((a) => a.nombre_completo).join(", ")
-                : "-";
+                : "Sin académicos involucrados"; // <--- CAMBIO AQUÍ para Excel
+          } else if (col.key === "estudiantes") {
+            // <--- NUEVA LÓGICA PARA ESTUDIANTES EN EXCEL
+            row[col.label] =
+              Array.isArray(p.estudiantes) && p.estudiantes.length > 0
+                ? p.estudiantes
+                    .map((e) => `${e.nombre} ${e.a_paterno || ""}`.trim())
+                    .join(", ")
+                : "Sin estudiantes involucrados";
           } else {
             row[col.label] = p[col.key] ?? "-";
           }

@@ -44,6 +44,7 @@ import {
 
 import { Spinner } from "@/components/ui/spinner";
 import funcionesService from "../api/funciones.js";
+import estudiantesService from "../api/estudiantes.js";
 import academicosService from "../api/academicos.js"; // Necesario para getFotosPorAcademico
 import { useError } from "@/contexts/ErrorContext";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -60,6 +61,7 @@ export default function VisualizacionPage() {
   const [projectsData, setProjectsData] = useState([]);
   const [selectedStatus, setSelectedStatus] = useState("todos");
   const [academicosMap, setAcademicosMap] = useState({});
+  const [estudiantesMap, setEstudiantesMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [errorLocal, setErrorLocal] = useState(null);
   const { setError: setErrorGlobal } = useError();
@@ -203,6 +205,32 @@ export default function VisualizacionPage() {
       }, {});
       setAcademicosMap(newAcademicosMap);
 
+      // *** NUEVA LÓGICA PARA ESTUDIANTES ***
+      const estudiantesPromises = projects.map(async (project) => {
+        try {
+          const estudiantes =
+            await estudiantesService.getEstudiantesPorProyecto(
+              project.id_proyecto
+            );
+          return { id_proyecto: project.id_proyecto, estudiantes };
+        } catch (e) {
+          console.error(
+            `Error al obtener estudiantes para proyecto ${project.id_proyecto}:`,
+            e
+          );
+          return { id_proyecto: project.id_proyecto, estudiantes: [] }; // Retorna array vacío en caso de error
+        }
+      });
+
+      const estudiantesResponses = await Promise.all(estudiantesPromises);
+
+      const newEstudiantesMap = estudiantesResponses.reduce((map, item) => {
+        map[item.id_proyecto] = item.estudiantes;
+        return map;
+      }, {});
+      setEstudiantesMap(newEstudiantesMap); // <--- GUARDAR EL MAPA DE ESTUDIANTES
+      // *** FIN NUEVA LÓGICA PARA ESTUDIANTES ***
+
       setProjectsData(projects);
     } catch (err) {
       console.error("Error fetching data for VisualizacionPage:", err);
@@ -210,7 +238,7 @@ export default function VisualizacionPage() {
         err.message || "Error desconocido al cargar los proyectos."
       );
       setErrorGlobal({
-        type: "error", // Forzar a tipo error si falló
+        type: "error",
         title: "Error al cargar los proyectos",
       });
     } finally {
@@ -308,6 +336,11 @@ export default function VisualizacionPage() {
     },
     [totalPages]
   );
+
+  // **** Obtener estudiantes para el modal ****
+  const estudiantesInModal = selectedProject
+    ? estudiantesMap[selectedProject.id_proyecto] || []
+    : [];
 
   return (
     <div className="h-full bg-gradient-to-br from-slate-50 to-blue-50">
@@ -462,6 +495,7 @@ export default function VisualizacionPage() {
                 key={project.id_proyecto}
                 project={project}
                 academicosDelProyecto={academicosMap[project.id_proyecto]}
+                estudiantesDelProyecto={estudiantesMap[project.id_proyecto]} // <--- NUEVA PROP
                 onClick={() => handleCardClick(project)}
               />
             ))}
@@ -603,43 +637,73 @@ export default function VisualizacionPage() {
                   </p>
                 </div>
               </div>
-
-              {/* Columna Derecha: Académicos Involucrados */}
-              <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                <h4 className="text-lg font-semibold text-gray-800 mb-2 flex items-center gap-2">
-                  <GraduationCap className="h-4 w-4 text-[#2E5C8A]" />
-                  Académicos Involucrados
-                </h4>
-                {loadingFotos ? (
-                  <div className="flex justify-center items-center h-16">
-                    <Spinner size={24} className="text-[#2E5C8A]" />
-                  </div>
-                ) : academicosFotos.length === 0 ? (
-                  <p className="text-s text-gray-500 text-center">
-                    No hay fotos de académicos disponibles.
-                  </p>
-                ) : (
-                  <div className="grid grid-cols-1 gap-y-2">
-                    {academicosMap[
-                      selectedProject.id_proyecto
-                    ]?.profesores?.map((academico) => (
-                      <div
-                        key={academico.id_academico}
-                        className="flex items-center gap-2"
-                      >
-                        <img
-                          src={academicosFotos[academico.id_academico]}
-                          alt={`Foto de ${academico.nombre_completo || "académico"}`}
-                          className="w-16 h-16 object-cover rounded-full border border-gray-200 flex-shrink-0"
-                        />
-                        <p className="text-s font-medium text-gray-800 leading-tight">
-                          {academico.nombre_completo}
-                        </p>
+              {/* Columna Derecha: Académicos y Estudiantes Involucrados */}
+              <div className="flex flex-col gap-4">
+                {" "}
+                {/* Contenedor para ambas secciones */}
+                {/* Sección de Académicos Involucrados */}
+                <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                  <h4 className="text-lg font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                    <GraduationCap className="h-4 w-4 text-[#2E5C8A]" />
+                    Académicos Involucrados
+                  </h4>
+                  {loadingFotos ? (
+                    <div className="flex justify-center items-center h-16">
+                      <Spinner size={24} className="text-[#2E5C8A]" />
+                    </div>
+                  ) : // Lógica de renderizado para académicos
+                  academicosMap[selectedProject.id_proyecto]?.profesores
+                      ?.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-y-2">
+                      {academicosMap[
+                        selectedProject.id_proyecto
+                      ]?.profesores?.map((academico) => (
+                        <div
+                          key={academico.id_academico}
+                          className="flex items-center gap-2"
+                        >
+                          <img
+                            src={academicosFotos[academico.id_academico]}
+                            alt={`Foto de ${
+                              academico.nombre_completo || "académico"
+                            }`}
+                            className="w-16 h-16 object-cover rounded-full border border-gray-200 flex-shrink-0"
+                          />
+                          <p className="text-s font-medium text-gray-800 leading-tight">
+                            {academico.nombre_completo}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    // Texto cuando no hay académicos
+                    <p className="text-s text-gray-500 text-center">
+                      Sin académicos involucrados.
+                    </p>
+                  )}
+                </div>
+                {/* Sección de Estudiantes Involucrados (NUEVA) */}
+                {estudiantesInModal &&
+                  estudiantesInModal.length > 0 && ( // Condición para renderizar la sección
+                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                      <h4 className="text-lg font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                        <GraduationCap className="h-4 w-4 text-[#2E5C8A]" />{" "}
+                        {/* Icono de estudiante */}
+                        Estudiantes Involucrados
+                      </h4>
+                      <div className="grid grid-cols-1 gap-y-1">
+                        {estudiantesInModal.map((estudiante, index) => (
+                          <p key={index} className="text-s text-gray-800">
+                            {`${estudiante.nombre} ${
+                              estudiante.a_paterno || ""
+                            }`.trim()}
+                          </p>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                    </div>
+                  )}
+              </div>{" "}
+              {/* Fin de la Columna Derecha */}
             </div>
           </DialogContent>
         </Dialog>

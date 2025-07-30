@@ -1,6 +1,7 @@
 // src/pages/HomePage.jsx
 import { Button } from "@/components/ui/button";
 import funcionesService from "../api/funciones.js";
+import estudiantesService from "../api/estudiantes.js";
 import FondosActivosSection from "../pages/components/FondosActivosSection"; // Asegúrate de esta ruta
 import estadisticasService from "../api/estadisticas.js";
 import { useState, useEffect } from "react";
@@ -63,12 +64,15 @@ export default function HomePage() {
     setLoadingQuickStats(true);
     setError(null);
     try {
-      const [projectsResponse, academicosResponse, profProjectsResponse] =
-        await Promise.all([
-          funcionesService.getDataInterseccionProyectos(),
-          funcionesService.getAcademicosPorProyecto(),
-          estadisticasService.getAcademicosPorUnidad(),
-        ]);
+      const [
+        projectsResponse,
+        academicosResponse,
+        profProjectsResponse, // No se usa directamente en el contexto del proyecto
+      ] = await Promise.all([
+        funcionesService.getDataInterseccionProyectos(),
+        funcionesService.getAcademicosPorProyecto(),
+        estadisticasService.getAcademicosPorUnidad(), // Esto es para estadisticas, no para proyectosContexto
+      ]);
 
       const projects = Array.isArray(projectsResponse) ? projectsResponse : [];
       const academicosPorProyecto = Array.isArray(academicosResponse)
@@ -79,15 +83,47 @@ export default function HomePage() {
         map[item.id_proyecto] = item;
         return map;
       }, {});
-      const projectsWithAcademicos = projects.map((project) => ({
+
+      // *** Parte nueva para estudiantes ***
+      // Recolectar todas las promesas para obtener estudiantes por proyecto
+      const estudiantesPromises = projects.map(async (project) => {
+        try {
+          const estudiantes =
+            await estudiantesService.getEstudiantesPorProyecto(
+              project.id_proyecto
+            );
+          return { id_proyecto: project.id_proyecto, estudiantes };
+        } catch (e) {
+          console.error(
+            `Error al obtener estudiantes para proyecto ${project.id_proyecto}:`,
+            e
+          );
+          return { id_proyecto: project.id_proyecto, estudiantes: [] }; // Retorna array vacío en caso de error
+        }
+      });
+
+      // Esperar a que todas las promesas de estudiantes se resuelvan
+      const estudiantesResponses = await Promise.all(estudiantesPromises);
+
+      // Crear un mapa de estudiantes por proyecto
+      const newEstudiantesMap = estudiantesResponses.reduce((map, item) => {
+        map[item.id_proyecto] = item.estudiantes;
+        return map;
+      }, {});
+      // *** Fin parte nueva para estudiantes ***
+
+      // Combinar proyectos con académicos y ahora también con estudiantes
+      const projectsWithAcademicosAndEstudiantes = projects.map((project) => ({
         ...project,
         academicos: newAcademicosMap[project.id_proyecto]?.profesores || [],
+        estudiantes: newEstudiantesMap[project.id_proyecto] || [], // Añadir estudiantes
       }));
-      setProyectosContexto(projectsWithAcademicos);
 
-      setProyectosCrudosData(
-        Array.isArray(projectsResponse) ? projectsResponse : []
-      );
+      setProyectosContexto(projectsWithAcademicosAndEstudiantes);
+
+      // Los `proyectosCrudosData` y `proyectosProfesorData` todavía se setean
+      // para los Quick Stats y otros usos directos en HomePage.
+      setProyectosCrudosData(projects);
       setProyectosProfesorData(
         Array.isArray(profProjectsResponse) ? profProjectsResponse : []
       );

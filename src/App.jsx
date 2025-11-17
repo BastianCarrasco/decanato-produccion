@@ -7,6 +7,7 @@ import {
 } from "react-router-dom";
 
 import Navbar from "./pages/layout/Navbar";
+import Sidebar from "./pages/components/Sidebar";
 import Footer from "./pages/layout/Footer";
 
 // Importa tus componentes de página nuevos y existentes
@@ -17,8 +18,8 @@ import FondosPage from "./pages/FondosPage";
 import FormulariosPage from "./pages/FormulariosPage";
 import AnadirProyectosPage from "./pages/AnadirProyectosPage";
 import EditarProyectosPage from "./pages/EditarProyectosPage";
+import ModificarCarteraPage from "./pages/ModificarCarteraPage";
 
-// **** Importa tus Providers de contexto ****
 import { LoadingProvider } from "./contexts/LoadingContext";
 import { ErrorProvider } from "./contexts/ErrorContext";
 import { ProyectosProvider } from "./contexts/ProyectosContext";
@@ -28,37 +29,31 @@ function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Función para determinar qué elemento del Navbar está activo
-  const getActiveNavbarItem = () => {
+  // Función para determinar qué elemento del Sidebar está activo
+  const getActiveSidebarItem = () => {
     const currentPath = location.pathname;
 
     if (currentPath === "/") return "home";
     if (currentPath.startsWith("/visualizacion")) return "visualizacion";
 
-    // Modificado: Cartera de proyectos ahora activa con sus sub-rutas
+    // Modificar Cartera activa con sus sub-rutas
     if (
-      currentPath.startsWith("/anadir-proyectos") ||
-      currentPath.startsWith("/editar-proyectos")
+      currentPath.startsWith("/modificar") 
     ) {
-      return "cartera_proyectos"; // Un nuevo identificador para el menú de cartera
+      return "modificar";
     }
 
-    // Perfiles de proyecto sigue como antes con sus sub-rutas
-    if (
-      currentPath.startsWith("/estadisticas") ||
-      currentPath.startsWith("/fondos") ||
-      currentPath.startsWith("/formularios")
-    ) {
-      return "perfiles_proyecto";
-    }
+    if (currentPath.startsWith("/estadisticas")) return "estadisticas";
+    if (currentPath.startsWith("/fondos")) return "fondos";
+    if (currentPath.startsWith("/formularios")) return "formularios";
 
-    return "home"; // Valor por defecto si no coincide con nada
+    return "home"; // Valor por defecto
   };
 
-  const activeNavbarItem = getActiveNavbarItem();
+  const activeSidebarItem = getActiveSidebarItem();
 
-  // Función para manejar la navegación desde el Navbar
-  const handleNavbarNavigation = (item) => {
+  // Función para manejar la navegación desde el Sidebar
+  const handleSidebarNavigation = (item) => {
     switch (item) {
       case "home":
         navigate("/");
@@ -66,12 +61,8 @@ function AppContent() {
       case "visualizacion":
         navigate("/visualizacion");
         break;
-      // Modificado: Ahora el Navbar llamará directamente a las rutas de las páginas
-      case "anadir-proyectos": // Nuevo caso
-        navigate("/anadir-proyectos");
-        break;
-      case "editar-proyectos": // Nuevo caso
-        navigate("/editar-proyectos");
+      case "modificar":
+        navigate("/modificar");
         break;
       case "estadisticas":
         navigate("/estadisticas");
@@ -88,22 +79,23 @@ function AppContent() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* Navbar Fijo */}
-      <Navbar
-        activeItem={activeNavbarItem}
-        onNavItemClick={handleNavbarNavigation}
+    <div className="min-h-screen flex">
+      {/* Sidebar Fijo */}
+      <Sidebar
+        activeItem={activeSidebarItem}
+        onNavItemClick={handleSidebarNavigation}
       />
 
       {/* Contenido Dinámico de la Página (ocupará el espacio restante) */}
-      <main className="flex-grow">
+      <main className="flex-grow ml-64">
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/visualizacion" element={<VisualizacionPage />} />
+          <Route path="/modificar" element={<ModificarCarteraPage />} />
 
           {/* Nuevas rutas directas para las páginas de Cartera */}
-          <Route path="/anadir-proyectos" element={<AnadirProyectosPage />} />
-          <Route path="/editar-proyectos" element={<EditarProyectosPage />} />
+          {/* <Route path="/anadir-proyectos" element={<AnadirProyectosPage />} /> */}
+          {/* <Route path="/editar-proyectos" element={<EditarProyectosPage />} /> */}
 
           <Route path="/estadisticas" element={<EstadisticasPage />} />
           <Route path="/fondos" element={<FondosPage />} />
@@ -112,10 +104,9 @@ function AppContent() {
           {/* Ruta 404 para cualquier otra URL */}
           <Route path="*" element={<div>Página no encontrada (404)</div>} />
         </Routes>
+        {/* Footer Fijo  */}
+        {/* <Footer /> */}
       </main>
-
-      {/* Footer Fijo  */}
-      <Footer />
     </div>
   );
 }

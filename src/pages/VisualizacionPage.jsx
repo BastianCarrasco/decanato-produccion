@@ -242,6 +242,7 @@ export default function VisualizacionPage() {
         academico_partner: project["Académic@/s-Partner"],
         estudiantes: project["Estudiantes"],
         unidad: project["Unidad Académica"],
+        unidad_partner: project["Unidad Académica ++"],
         nombre_convo: project["Nombre Convocatoria a la que se postuló"],
         convocatoria: project["Tipo Convocatoria"],
         institucion: project["Institucion Convocatoria"],
@@ -659,6 +660,9 @@ export default function VisualizacionPage() {
                     </p>
                     <p className="text-white font-semibold text-sm">
                       {selectedProject.unidad || "Sin información"}
+                      {selectedProject.unidad_partner && (
+                        <span>, {selectedProject.unidad_partner}</span>
+                      )}
                     </p>
                   </div>
 

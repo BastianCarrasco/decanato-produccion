@@ -798,6 +798,8 @@ export default function ModificarCartera() {
                     </p>
                     <p className="text-white font-semibold text-sm">
                       {selectedProject["Unidad Académica"] || "Sin información"}
+                      {selectedProject["Unidad Académica ++"] &&
+                        `, ${selectedProject["Unidad Académica ++"]}`}
                     </p>
                   </div>
 

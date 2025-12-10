@@ -4,6 +4,7 @@ import funcionesService from "../api/funciones.js";
 import estudiantesService from "../api/estudiantes.js";
 import FondosActivosSection from "../pages/components/FondosActivosSection";
 import estadisticasService from "../api/estadisticas.js";
+import analisisService from "../api/analisisService.js"; // <-- Importa el nuevo servicio
 import { useState, useEffect } from "react";
 import { useProyectos } from "@/contexts/ProyectosContext";
 import { Spinner } from "@/components/ui/spinner";
@@ -42,29 +43,36 @@ export default function HomePage() {
   const { setError } = useError();
   const [copiedMessage, setCopiedMessage] = useState(false);
 
+  // Nuevo estado para almacenar los datos del análisis
+  const [analisisData, setAnalisisData] = useState(null);
+
   const { loadingExportPDF, loadingExportExcel, generarPDF, generarExcel } =
     useExportData();
 
-  const proyectosEnCartera = Array.isArray(proyectosCrudosData)
-    ? proyectosCrudosData.length
-    : 0;
-  const postuladosCount = Array.isArray(proyectosCrudosData)
-    ? proyectosCrudosData.filter((p) => p.estatus === "Postulado").length
-    : 0;
-  const perfiladosCount = Array.isArray(proyectosCrudosData)
-    ? proyectosCrudosData.filter((p) => p.estatus === "Perfil").length
-    : 0;
+  // Ahora, estos valores se obtendrán de analisisData
+  const proyectosEnCartera = analisisData?.totalProyectos || 0;
+  const postuladosCount =
+    analisisData?.estatus?.datos?.find((e) => e.nombre === "Postulado")
+      ?.cantidad || 0;
+  const perfiladosCount =
+    analisisData?.estatus?.datos?.find((e) => e.nombre === "Perfil")
+      ?.cantidad || 0;
 
   const fetchData = async () => {
     setLoadingQuickStats(true);
     setError(null);
     try {
-      const [projectsResponse, academicosResponse, profProjectsResponse] =
-        await Promise.all([
-          funcionesService.getDataInterseccionProyectos(),
-          funcionesService.getAcademicosPorProyecto(),
-          estadisticasService.getAcademicosPorUnidad(),
-        ]);
+      const [
+        projectsResponse,
+        academicosResponse,
+        profProjectsResponse,
+        analisisResponse, // <-- Nueva llamada al servicio de análisis
+      ] = await Promise.all([
+        funcionesService.getDataInterseccionProyectos(),
+        funcionesService.getAcademicosPorProyecto(),
+        estadisticasService.getAcademicosPorUnidad(),
+        analisisService.getAnalisisProyectos(), // <-- Llama al nuevo servicio
+      ]);
 
       const projects = Array.isArray(projectsResponse) ? projectsResponse : [];
       const academicosPorProyecto = Array.isArray(academicosResponse)
@@ -110,6 +118,7 @@ export default function HomePage() {
       setProyectosProfesorData(
         Array.isArray(profProjectsResponse) ? profProjectsResponse : []
       );
+      setAnalisisData(analisisResponse); // <-- Guarda los datos del análisis
     } catch (e) {
       console.error("Error fetching data for dashboard summary:", e);
       setError(e.message || "Error desconocido al cargar los datos.");

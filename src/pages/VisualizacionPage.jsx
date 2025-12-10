@@ -42,9 +42,10 @@ import {
 } from "@/components/ui/dialog";
 
 import { Spinner } from "@/components/ui/spinner";
-import funcionesService from "../api/funciones.js";
-import estudiantesService from "../api/estudiantes.js";
-import academicosService from "../api/academicos.js";
+// Removed these imports as we'll now use a single API endpoint
+// import funcionesService from "../api/funciones.js";
+// import estudiantesService from "../api/estudiantes.js";
+// import academicosService from "../api/academicos.js";
 import { useError } from "@/contexts/ErrorContext";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -58,7 +59,9 @@ export default function VisualizacionPage() {
   const [orden, setOrden] = useState("reciente");
   const [projectsData, setProjectsData] = useState([]);
   const [selectedStatus, setSelectedStatus] = useState("todos");
+  // academicosMap will now be directly populated from the denormalized data
   const [academicosMap, setAcademicosMap] = useState({});
+  // estudiantesMap will now be directly populated from the denormalized data
   const [estudiantesMap, setEstudiantesMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [errorLocal, setErrorLocal] = useState(null);
@@ -74,95 +77,93 @@ export default function VisualizacionPage() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
-  const [academicosFotos, setAcademicosFotos] = useState([]);
+  const [academicosFotos, setAcademicosFotos] = useState({}); // Changed to object for easier lookup
   const academicosFotosCache = useRef({});
   const [loadingFotos, setLoadingFotos] = useState(false);
 
   const formatDateFull = useCallback((dateString) => {
     if (!dateString) return "Sin fecha";
     try {
+      // Ensure dateString is compatible with Date constructor
+      // For "sept-24" format, we might need a more robust parsing logic if the year isn't inferable
+      // Assuming a full date string like "2024-09-01" or "September 1, 2024" for now
       const date = new Date(dateString);
-      if (isNaN(date)) return "Fecha Inválida";
+      if (isNaN(date.getTime())) {
+        // Use getTime() to check for invalid dates
+        // Attempt to parse 'MMM-YY' format if it's the issue
+        const parts = dateString.split("-");
+        if (parts.length === 2) {
+          const monthMap = {
+            ene: 0,
+            feb: 1,
+            mar: 2,
+            abr: 3,
+            may: 4,
+            jun: 5,
+            jul: 6,
+            ago: 7,
+            sep: 8,
+            oct: 9,
+            nov: 10,
+            dic: 11,
+          };
+          const month = monthMap[parts[0].toLowerCase()];
+          // Assuming "24" means "2024", adjust century as needed
+          const year = 2000 + parseInt(parts[1], 10);
+          if (month !== undefined && !isNaN(year)) {
+            const parsedDate = new Date(year, month, 1);
+            if (!isNaN(parsedDate.getTime())) {
+              const options = {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              };
+              return parsedDate.toLocaleDateString("es-CL", options);
+            }
+          }
+        }
+        return "Fecha Inválida";
+      }
       const options = { year: "numeric", month: "long", day: "numeric" };
       return date.toLocaleDateString("es-CL", options);
     } catch (e) {
-      console.warn("Invalid date string for modal (full format):", dateString, e);
+      console.warn(
+        "Invalid date string for modal (full format):",
+        dateString,
+        e
+      );
       return "Fecha Inválida";
     }
   }, []);
+
+  const MONGO_BACKEND_API_URL = import.meta.env.VITE_URL_BACKEND_MONGO;
 
   const handleCardClick = useCallback(
     async (project) => {
       setSelectedProject(project);
       setIsModalOpen(true);
-      setLoadingFotos(true);
-      setAcademicosFotos([]);
+      setLoadingFotos(true); // Se puede mantener para un breve "flash" de carga si se desea, aunque no habrá fetch real.
 
-      const academicosEnProyecto =
+      const academicosInProject =
         academicosMap[project.id_proyecto]?.profesores || [];
-      const academicosIds = academicosEnProyecto.map((p) => p.id_academico);
 
       const FALLBACK_PHOTO_URL =
         "https://t4.ftcdn.net/jpg/01/86/29/31/360_F_186293166_P4yk3uXQBDapbDFlR17ivpM6B1ux0fHG.jpg";
 
-      const photosToLoad = {};
-      const promisesToMake = [];
-      const idsToFetch = [];
-
-      academicosIds.forEach((id) => {
-        if (academicosFotosCache.current[id]) {
-          photosToLoad[id] = academicosFotosCache.current[id];
-        } else {
-          idsToFetch.push(id);
-          promisesToMake.push(academicosService.getFotosPorAcademico(id));
-        }
+      const photosForModal = {};
+      academicosInProject.forEach((academico) => {
+        photosForModal[academico.id_academico] =
+          academico.link_foto || FALLBACK_PHOTO_URL;
       });
 
-      setAcademicosFotos(photosToLoad);
-      setLoadingFotos(idsToFetch.length > 0);
+      setAcademicosFotos(photosForModal);
+      setLoadingFotos(false); // No hay llamadas asíncronas para fotos, así que se desactiva inmediatamente.
 
-      if (idsToFetch.length > 0) {
-        try {
-          const fotosResponses = await Promise.all(promisesToMake);
-          fotosResponses.forEach((responseArray, index) => {
-            const academicoId = idsToFetch[index];
-            const photoLink =
-              responseArray && responseArray.length > 0 && responseArray[0].link
-                ? responseArray[0].link
-                : null;
-            if (photoLink) {
-              photosToLoad[academicoId] = photoLink;
-              academicosFotosCache.current[academicoId] = photoLink;
-            } else {
-              photosToLoad[academicoId] = FALLBACK_PHOTO_URL;
-              academicosFotosCache.current[academicoId] = FALLBACK_PHOTO_URL;
-            }
-          });
-          setAcademicosFotos(photosToLoad);
-        } catch (err) {
-          console.error("Error fetching academic photos:", err);
-          setErrorGlobal({
-            type: "error",
-            title: "Error al cargar las fotos de los académicos.",
-          });
-          idsToFetch.forEach((id) => {
-            photosToLoad[id] = FALLBACK_PHOTO_URL;
-            academicosFotosCache.current[id] = FALLBACK_PHOTO_URL;
-          });
-          setAcademicosFotos(photosToLoad);
-        } finally {
-          setLoadingFotos(false);
-        }
-      } else {
-        setLoadingFotos(false);
-      }
-
-      if (academicosIds.length === 0) {
+      if (academicosInProject.length === 0) {
         setAcademicosFotos({});
-        setLoadingFotos(false);
       }
     },
-    [academicosMap, setErrorGlobal, academicosFotosCache]
+    [academicosMap] // Depende de academicosMap para asegurar que la información esté actualizada
   );
 
   const fetchData = async () => {
@@ -171,47 +172,87 @@ export default function VisualizacionPage() {
     setErrorGlobal(null);
 
     try {
-      const [projectsResponse, academicosResponse] = await Promise.all([
-        funcionesService.getDataInterseccionProyectos(),
-        funcionesService.getAcademicosPorProyecto(),
-      ]);
+      const response = await fetch(MONGO_BACKEND_API_URL);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const result = await response.json();
+      const fetchedProjects = Array.isArray(result.data) ? result.data : [];
 
-      const projects = Array.isArray(projectsResponse) ? projectsResponse : [];
-      const academicosPorProyecto = Array.isArray(academicosResponse)
-        ? academicosResponse
-        : [];
+      const newAcademicosMap = {};
+      const newEstudiantesMap = {};
 
-      const newAcademicosMap = academicosPorProyecto.reduce((map, item) => {
-        map[item.id_proyecto] = item;
-        return map;
-      }, {});
-      setAcademicosMap(newAcademicosMap);
-
-      const estudiantesPromises = projects.map(async (project) => {
-        try {
-          const estudiantes =
-            await estudiantesService.getEstudiantesPorProyecto(
-              project.id_proyecto
-            );
-          return { id_proyecto: project.id_proyecto, estudiantes };
-        } catch (e) {
-          console.error(
-            `Error al obtener estudiantes para proyecto ${project.id_proyecto}:`,
-            e
-          );
-          return { id_proyecto: project.id_proyecto, estudiantes: [] };
+      fetchedProjects.forEach((project) => {
+        const projectAcademicos = [];
+        if (project["Académic@/s-Líder"]) {
+          projectAcademicos.push({
+            id_academico: project._id + "-lider",
+            nombre_completo: project["Académic@/s-Líder"],
+            link_foto: project.link_foto_lider, // <--- ESTO ES CLAVE
+          });
         }
+        if (project["Académic@/s-Partner"]) {
+          const partners = project["Académic@/s-Partner"]
+            .split(",")
+            .map((p) => p.trim())
+            .filter(Boolean);
+          partners.forEach((partnerName, index) => {
+            projectAcademicos.push({
+              id_academico: project._id + "-partner-" + index,
+              nombre_completo: partnerName,
+              link_foto: project.link_foto_partner, // <--- ESTO TAMBIÉN ES CLAVE
+            });
+          });
+        }
+        newAcademicosMap[project._id] = {
+          id_proyecto: project._id,
+          profesores: projectAcademicos,
+        };
+
+        // ... (estudiantesMap creation remains the same)
+        const projectEstudiantes = [];
+        if (project.Estudiantes) {
+          const studentNames = project.Estudiantes.split(",")
+            .map((s) => s.trim())
+            .filter(Boolean);
+          studentNames.forEach((name, index) => {
+            projectEstudiantes.push({
+              id_estudiante: project._id + "-estudiante-" + index,
+              nombre: name,
+              a_paterno: "",
+            });
+          });
+        }
+        newEstudiantesMap[project._id] = projectEstudiantes;
       });
 
-      const estudiantesResponses = await Promise.all(estudiantesPromises);
-
-      const newEstudiantesMap = estudiantesResponses.reduce((map, item) => {
-        map[item.id_proyecto] = item.estudiantes;
-        return map;
-      }, {});
+      setAcademicosMap(newAcademicosMap);
       setEstudiantesMap(newEstudiantesMap);
 
-      setProjectsData(projects);
+      // ... (transformedProjects creation remains the same)
+      const transformedProjects = fetchedProjects.map((project) => ({
+        id_proyecto: project._id,
+        nombre: project["Nombre Proyecto/Perfil Proyecto"],
+        tematica: project["Temática"],
+        estatus: project["Estatus"],
+        tipo_apoyo: project["Tipo Apoyo"],
+        detalle_apoyo: project["Detalle Apoyo"],
+        monto: project["Monto Proyecto MM$"],
+        academico_lider: project["Académic@/s-Líder"],
+        academico_partner: project["Académic@/s-Partner"],
+        estudiantes: project["Estudiantes"],
+        unidad: project["Unidad Académica"],
+        nombre_convo: project["Nombre Convocatoria a la que se postuló"],
+        convocatoria: project["Tipo Convocatoria"],
+        institucion: project["Institucion Convocatoria"],
+        fecha_postulacion: project["Fecha Postulación"],
+        comentarios: project["Comentarios"],
+        validar: project["VALIDAR"],
+        link_foto_lider: project.link_foto_lider,
+        link_foto_partner: project.link_foto_partner,
+      }));
+
+      setProjectsData(transformedProjects);
     } catch (err) {
       console.error("Error fetching data for VisualizacionPage:", err);
       setErrorLocal(
@@ -231,7 +272,7 @@ export default function VisualizacionPage() {
   }, []);
 
   const uniqueConvocatorias = [
-    ...new Set(projectsData.map((p) => p.nombre_convo)),
+    ...new Set(projectsData.map((p) => p.nombre_convo)), // Changed to nombre_convo as per transformation
   ]
     .filter(Boolean)
     .sort();
@@ -252,7 +293,7 @@ export default function VisualizacionPage() {
       project.nombre.toLowerCase().startsWith(searchTerm.toLowerCase());
     const matchesConvocatoria =
       selectedConvocatoria === "todos" ||
-      project.convocatoria === selectedConvocatoria;
+      project.nombre_convo === selectedConvocatoria; // Changed to nombre_convo
     const matchesTematica =
       selectedTematica === "todos" || project.tematica === selectedTematica;
     const matchesInstitucion =
@@ -269,16 +310,49 @@ export default function VisualizacionPage() {
   });
 
   const sortedProjects = [...filteredProjects].sort((a, b) => {
-    const hasDateA =
-      a.fecha_postulacion && !isNaN(new Date(a.fecha_postulacion));
-    const hasDateB =
-      b.fecha_postulacion && !isNaN(new Date(b.fecha_postulacion));
+    // We need to parse the "Fecha Postulación" which might be "sept-24"
+    const parseDate = (dateString) => {
+      if (!dateString) return null;
+      // Handle "MMM-YY" format
+      const parts = dateString.split("-");
+      if (parts.length === 2) {
+        const monthMap = {
+          ene: 0,
+          feb: 1,
+          mar: 2,
+          abr: 3,
+          may: 4,
+          jun: 5,
+          jul: 6,
+          ago: 7,
+          sep: 8,
+          oct: 9,
+          nov: 10,
+          dic: 11,
+        };
+        const month = monthMap[parts[0].toLowerCase()];
+        const year = 2000 + parseInt(parts[1], 10); // Assuming 20xx for "xx" year
+        if (month !== undefined && !isNaN(year)) {
+          return new Date(year, month, 1); // Day 1 of the month
+        }
+      }
+      // Fallback for full date strings if they appear
+      const date = new Date(dateString);
+      return isNaN(date.getTime()) ? null : date;
+    };
+
+    const dateA = parseDate(a.fecha_postulacion);
+    const dateB = parseDate(b.fecha_postulacion);
+
+    const hasDateA = dateA !== null;
+    const hasDateB = dateB !== null;
+
     if (!hasDateA && !hasDateB) return 0;
     if (!hasDateA) return orden === "reciente" ? 1 : -1;
     if (!hasDateB) return orden === "reciente" ? -1 : 1;
-    const dateA = new Date(a.fecha_postulacion);
+
+    // Set to UTC start of day for consistent comparison, though month precision might be enough
     dateA.setUTCHours(0, 0, 0, 0);
-    const dateB = new Date(b.fecha_postulacion);
     dateB.setUTCHours(0, 0, 0, 0);
 
     if (orden === "reciente") {
@@ -359,7 +433,10 @@ export default function VisualizacionPage() {
             </div>
 
             <div>
-              <Select value={selectedInstitucion} onValueChange={setSelectedInstitucion}>
+              <Select
+                value={selectedInstitucion}
+                onValueChange={setSelectedInstitucion}
+              >
                 <SelectTrigger className="bg-white/60 backdrop-blur-md border-white/60 hover:bg-white/80 transition-all">
                   <SelectValue placeholder="Todas las instituciones" />
                 </SelectTrigger>
@@ -375,7 +452,10 @@ export default function VisualizacionPage() {
             </div>
 
             <div>
-              <Select value={selectedTematica} onValueChange={setSelectedTematica}>
+              <Select
+                value={selectedTematica}
+                onValueChange={setSelectedTematica}
+              >
                 <SelectTrigger className="bg-white/60 backdrop-blur-md border-white/60 hover:bg-white/80 transition-all">
                   <SelectValue placeholder="Todas las temáticas" />
                 </SelectTrigger>
@@ -415,7 +495,11 @@ export default function VisualizacionPage() {
         </div>
 
         {/* Tabs */}
-        <Tabs value={selectedStatus} onValueChange={setSelectedStatus} className="mb-6">
+        <Tabs
+          value={selectedStatus}
+          onValueChange={setSelectedStatus}
+          className="mb-6"
+        >
           <TabsList className="flex flex-nowrap overflow-x-auto bg-white/40 backdrop-blur-lg border border-white/50 rounded-xl p-1 shadow-lg">
             <TabsTrigger
               value="todos"
@@ -427,19 +511,22 @@ export default function VisualizacionPage() {
               value="Postulado"
               className="text-xs px-3 py-2 sm:text-sm sm:px-4 sm:py-2.5 text-white data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#2E5C8A] data-[state=active]:to-[#3B76B3] data-[state=active]:text-white rounded-lg transition-all duration-300"
             >
-              Postulados ({projectsData.filter((p) => p.estatus === "Postulado").length})
+              Postulados (
+              {projectsData.filter((p) => p.estatus === "Postulado").length})
             </TabsTrigger>
             <TabsTrigger
               value="Adjudicado"
               className="text-xs px-3 py-2 sm:text-sm sm:px-4 sm:py-2.5 text-white data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#2E5C8A] data-[state=active]:to-[#3B76B3] data-[state=active]:text-white rounded-lg transition-all duration-300"
             >
-              Adjudicados ({projectsData.filter((p) => p.estatus === "Adjudicado").length})
+              Adjudicados (
+              {projectsData.filter((p) => p.estatus === "Adjudicado").length})
             </TabsTrigger>
             <TabsTrigger
               value="Perfil"
               className="text-xs px-3 py-2 sm:text-sm sm:px-4 sm:py-2.5 text-white data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#2E5C8A] data-[state=active]:to-[#3B76B3] data-[state=active]:text-white rounded-lg transition-all duration-300"
             >
-              Perfil ({projectsData.filter((p) => p.estatus === "Perfil").length})
+              Perfil (
+              {projectsData.filter((p) => p.estatus === "Perfil").length})
             </TabsTrigger>
           </TabsList>
         </Tabs>
@@ -452,7 +539,10 @@ export default function VisualizacionPage() {
             </div>
           </div>
         ) : errorLocal ? (
-          <Alert variant="destructive" className="bg-red-50/80 backdrop-blur-md text-red-700 border-red-200">
+          <Alert
+            variant="destructive"
+            className="bg-red-50/80 backdrop-blur-md text-red-700 border-red-200"
+          >
             <XCircle className="h-5 w-5" />
             <AlertTitle>Error al cargar proyectos</AlertTitle>
             <AlertDescription>{errorLocal}</AlertDescription>
@@ -462,8 +552,12 @@ export default function VisualizacionPage() {
             <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <Info className="h-10 w-10 text-[#2E5C8A]" />
             </div>
-            <h3 className="text-xl font-bold text-[#2E5C8A] mb-2">No hay proyectos</h3>
-            <p className="text-gray-600">No se encontraron proyectos con los filtros aplicados</p>
+            <h3 className="text-xl font-bold text-[#2E5C8A] mb-2">
+              No hay proyectos
+            </h3>
+            <p className="text-gray-600">
+              No se encontraron proyectos con los filtros aplicados
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
@@ -471,8 +565,8 @@ export default function VisualizacionPage() {
               <ProjectCard
                 key={project.id_proyecto}
                 project={project}
-                academicosDelProyecto={academicosMap[project.id_proyecto]}
-                estudiantesDelProyecto={estudiantesMap[project.id_proyecto]}
+                academicosDelProyecto={academicosMap[project.id_proyecto]} // Still pass this if ProjectCard expects it
+                estudiantesDelProyecto={estudiantesMap[project.id_proyecto]} // Still pass this if ProjectCard expects it
                 onClick={() => handleCardClick(project)}
               />
             ))}
@@ -482,7 +576,8 @@ export default function VisualizacionPage() {
         {/* Pagination */}
         <div className="flex justify-between items-center bg-white/40 backdrop-blur-xl rounded-2xl shadow-xl border border-white/50 p-4">
           <div className="text-sm font-medium text-[#2E5C8A]">
-            Mostrando {Math.min(sortedProjects.length, endIndex)} de {sortedProjects.length} proyectos
+            Mostrando {Math.min(sortedProjects.length, endIndex)} de{" "}
+            {sortedProjects.length} proyectos
           </div>
           <div className="flex space-x-2">
             <Button
@@ -513,7 +608,9 @@ export default function VisualizacionPage() {
               variant="outline"
               size="sm"
               onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages || sortedProjects.length === 0}
+              disabled={
+                currentPage === totalPages || sortedProjects.length === 0
+              }
               className="bg-white/60 backdrop-blur-md border-white/60 hover:bg-white/80 disabled:opacity-50"
             >
               Siguiente
@@ -538,10 +635,14 @@ export default function VisualizacionPage() {
                   <DialogTitle className="text-2xl md:text-3xl font-bold text-white mb-3 leading-tight">
                     {selectedProject.nombre}
                   </DialogTitle>
-                  
+
                   <div className="flex flex-wrap items-center gap-3 mb-4">
-                    {getStatusBadge(selectedProject.estatus || "Sin información")}
-                    {getThematicBadge(selectedProject.tematica || "Sin información")}
+                    {getStatusBadge(
+                      selectedProject.estatus || "Sin información"
+                    )}
+                    {getThematicBadge(
+                      selectedProject.tematica || "Sin información"
+                    )}
                     {selectedProject.institucion && (
                       <Badge className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold bg-white/20 backdrop-blur-md text-white border border-white/30">
                         {renderInstitucionLogo(selectedProject.institucion)}
@@ -566,7 +667,8 @@ export default function VisualizacionPage() {
                       Monto Solicitado
                     </p>
                     <p className="text-white font-bold text-lg">
-                      {selectedProject.monto !== null && selectedProject.monto !== undefined
+                      {selectedProject.monto !== null &&
+                      selectedProject.monto !== undefined
                         ? `$${selectedProject.monto.toLocaleString("es-CL")}`
                         : "Sin información"}
                     </p>
@@ -585,7 +687,6 @@ export default function VisualizacionPage() {
             </div>
 
             <div className="p-8 space-y-6 bg-white/40">
-              
               <div className="space-y-4">
                 <h3 className="text-xl font-bold text-[#1a3d5c] flex items-center gap-3">
                   <div className="w-10 h-10 bg-[#2E5C8A] rounded-lg flex items-center justify-center">
@@ -605,7 +706,7 @@ export default function VisualizacionPage() {
                           Tipo de Apoyo
                         </p>
                         <p className="text-sm font-bold text-[#1a3d5c]">
-                          {selectedProject.apoyo || "Sin información"}
+                          {selectedProject.tipo_apoyo || "Sin información"}
                         </p>
                         {selectedProject.detalle_apoyo && (
                           <p className="text-xs text-gray-700 mt-1">
@@ -628,7 +729,7 @@ export default function VisualizacionPage() {
                         <p className="text-sm font-bold text-[#1a3d5c]">
                           {selectedProject.nombre_convo || "Sin información"}
                         </p>
-                        {selectedProject.convocatoria && (
+                        {selectedProject.convocatoria && ( // This is 'Tipo Convocatoria'
                           <p className="text-xs text-gray-700 mt-1">
                             {selectedProject.convocatoria}
                           </p>
@@ -653,23 +754,36 @@ export default function VisualizacionPage() {
                       <div className="w-9 h-9 bg-[#2E5C8A] rounded-lg flex items-center justify-center">
                         <GraduationCap className="h-5 w-5 text-white" />
                       </div>
-                      <h4 className="text-lg font-bold text-[#1a3d5c]">Académicos</h4>
+                      <h4 className="text-lg font-bold text-[#1a3d5c]">
+                        Académicos
+                      </h4>
                     </div>
 
                     {loadingFotos ? (
                       <div className="flex justify-center items-center h-24">
                         <Spinner size={32} className="text-[#2E5C8A]" />
                       </div>
-                    ) : academicosMap[selectedProject.id_proyecto]?.profesores?.length > 0 ? (
+                    ) : academicosMap[selectedProject.id_proyecto]?.profesores
+                        ?.length > 0 ? (
                       <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
-                        {academicosMap[selectedProject.id_proyecto]?.profesores?.map((academico) => (
+                        {academicosMap[
+                          selectedProject.id_proyecto
+                        ]?.profesores?.map((academico) => (
                           <div
-                            key={academico.id_academico}
+                            key={academico.id_academico} // Use the generated id_academico
                             className="flex items-center gap-3 bg-gray-50 p-3 rounded-xl border border-gray-200 hover:bg-white transition-all"
                           >
                             <img
-                              src={academicosFotos[academico.id_academico]}
-                              alt={`Foto de ${academico.nombre_completo || "académico"}`}
+                              src={
+                                academicosFotos[academico.id_academico] ||
+                                academicosFotosCache.current[
+                                  academico.id_academico
+                                ] ||
+                                "https://t4.ftcdn.net/jpg/01/86/29/31/360_F_186293166_P4yk3uXQBDapbDFlR17ivpM6B1ux0fHG.jpg"
+                              }
+                              alt={`Foto de ${
+                                academico.nombre_completo || "académico"
+                              }`}
                               className="w-14 h-14 object-cover rounded-full border-2 border-gray-200 shadow-md flex-shrink-0"
                             />
                             <div>
@@ -684,7 +798,9 @@ export default function VisualizacionPage() {
                     ) : (
                       <div className="text-center py-10 bg-gray-50 rounded-xl border border-gray-200">
                         <GraduationCap className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-                        <p className="text-sm text-gray-600 font-medium">Sin académicos</p>
+                        <p className="text-sm text-gray-600 font-medium">
+                          Sin académicos
+                        </p>
                       </div>
                     )}
                   </div>
@@ -694,14 +810,16 @@ export default function VisualizacionPage() {
                       <div className="w-9 h-9 bg-[#2E5C8A] rounded-lg flex items-center justify-center">
                         <Users className="h-5 w-5 text-white" />
                       </div>
-                      <h4 className="text-lg font-bold text-[#1a3d5c]">Estudiantes</h4>
+                      <h4 className="text-lg font-bold text-[#1a3d5c]">
+                        Estudiantes
+                      </h4>
                     </div>
 
                     {estudiantesInModal && estudiantesInModal.length > 0 ? (
                       <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
-                        {estudiantesInModal.map((estudiante, index) => (
+                        {estudiantesInModal.map((estudiante) => (
                           <div
-                            key={index}
+                            key={estudiante.id_estudiante} // Use the generated id_estudiante
                             className="flex items-center gap-3 bg-gray-50 px-4 py-3 rounded-xl border border-gray-200 hover:bg-white transition-all"
                           >
                             <div className="w-11 h-11 bg-[#2E5C8A] rounded-full flex items-center justify-center text-white font-bold text-base shadow-md">
@@ -709,9 +827,13 @@ export default function VisualizacionPage() {
                             </div>
                             <div>
                               <p className="text-sm font-semibold text-[#1a3d5c]">
-                                {`${estudiante.nombre} ${estudiante.a_paterno || ""}`.trim()}
+                                {`${estudiante.nombre} ${
+                                  estudiante.a_paterno || ""
+                                }`.trim()}
                               </p>
-                              <p className="text-xs text-gray-600">Estudiante</p>
+                              <p className="text-xs text-gray-600">
+                                Estudiante
+                              </p>
                             </div>
                           </div>
                         ))}
@@ -719,13 +841,14 @@ export default function VisualizacionPage() {
                     ) : (
                       <div className="text-center py-10 bg-gray-50 rounded-xl border border-gray-200">
                         <Users className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-                        <p className="text-sm text-gray-600 font-medium">Sin estudiantes</p>
+                        <p className="text-sm text-gray-600 font-medium">
+                          Sin estudiantes
+                        </p>
                       </div>
                     )}
                   </div>
                 </div>
               </div>
-
             </div>
           </DialogContent>
         </Dialog>

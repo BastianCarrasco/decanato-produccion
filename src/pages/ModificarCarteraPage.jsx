@@ -51,7 +51,7 @@ export default function ModificarCartera() {
   const itemsPerPage = 9;
 
   const BACKEND_API_URL = import.meta.env.VITE_URL_BACKEND;
-  const MONGO_BACKEND_API_URL = import.meta.env.VITE_URL_BACKEND_MONGO;
+  const MONGO_BACKEND_API_URL = import.meta.env.VITE_URL_WALLET;
   const SPREADSHEET_ID = import.meta.env.VITE_SPREADSHEET_ID;
   const spreadsheetLink = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit?usp=sharing`;
 

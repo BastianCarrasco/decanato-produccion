@@ -136,7 +136,7 @@ export default function VisualizacionPage() {
     }
   }, []);
 
-  const MONGO_BACKEND_API_URL = import.meta.env.VITE_URL_BACKEND_MONGO;
+  const MONGO_BACKEND_API_URL = import.meta.env.VITE_URL_WALLET;
 
   const handleCardClick = useCallback(
     async (project) => {

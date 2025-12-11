@@ -37,14 +37,14 @@ import { useError } from "@/contexts/ErrorContext";
 import anidLogo from "../assets/tipos_convocatorias/anid_rojo_azul.png";
 import corfoLogo from "../assets/tipos_convocatorias/corfo2024.png";
 import goreLogo from "../assets/tipos_convocatorias/gore-valpo.jpg";
-import internasPucvLogo from "../assets/tipos_convocatorias/internaspucv.svg";
+import INTERNASPucvLogo from "../assets/tipos_convocatorias/INTERNASpucv.svg";
 import privadaLogo from "../assets/tipos_convocatorias/private.png";
 
 const FONDO_LOGOS = {
   ANID: anidLogo,
   CORFO: corfoLogo,
   GORE: goreLogo,
-  Internas: internasPucvLogo,
+  INTERNAS: INTERNASPucvLogo,
   PRIVADA: privadaLogo,
 };
 
@@ -52,7 +52,7 @@ const FONDO_URLS = {
   ANID: "https://anid.cl/",
   CORFO: "https://www.corfo.cl",
   GORE: "https://www.gobiernovalparaiso.cl/",
-  Internas: "https://www.pucv.cl/",
+  INTERNAS: "https://www.pucv.cl/",
   PRIVADA: "",
 };
 
@@ -76,7 +76,7 @@ export default function FondosPage() {
         return "bg-red-500 text-white";
       case "CORFO":
         return "bg-orange-500 text-white";
-      case "Internas":
+      case "INTERNAS":
         return "bg-blue-500 text-white";
       case "GORE":
         return "bg-purple-500 text-white";
@@ -169,7 +169,7 @@ export default function FondosPage() {
           `HTTP error al eliminar! status: ${deleteResponse.status}`
         );
       }
-      console.log("Fondos eliminados exitosamente.");
+      //  console.log("Fondos eliminados exitosamente.");
 
       // 2. Sincronizar (POST)
       const syncResponse = await fetch(SYNC_API_URL, {
@@ -184,7 +184,7 @@ export default function FondosPage() {
           `HTTP error al sincronizar! status: ${syncResponse.status}`
         );
       }
-      console.log("Sincronización completada exitosamente.");
+      //  console.log("Sincronización completada exitosamente.");
 
       // 3. Obtener los fondos actualizados
       const response = await fetch(FONDOS_API_URL);
@@ -262,7 +262,7 @@ export default function FondosPage() {
 
   const uniqueTiposFondo = useMemo(() => {
     const tiposDesdeData = fondosData.map((f) => f.tipo_nombre);
-    const tiposFijos = ["ANID", "CORFO", "GORE", "Internas", "PRIVADA"];
+    const tiposFijos = ["ANID", "CORFO", "GORE", "INTERNAS", "PRIVADA"];
     return [...new Set([...tiposDesdeData, ...tiposFijos])]
       .filter(Boolean)
       .sort();
@@ -498,7 +498,8 @@ export default function FondosPage() {
                         </span>
                       </div>
                       <div className="text-center text-gray-700 font-medium line-clamp-1">
-                        {fondo.financiamiento || "Sin información"}
+                        {fondo.financiamiento + " millones" ||
+                          "Sin información"}
                       </div>
                       <div className="text-center text-gray-700 line-clamp-1">
                         {fondo.duracion || "Sin información"}

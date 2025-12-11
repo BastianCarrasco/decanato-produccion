@@ -98,10 +98,10 @@ function SheetProjectCard({ project, onClick, showValidationBadge = false }) {
 
   const isValidated = String(project["VALIDAR"]).toLowerCase() === "true";
 
-  console.log("Proyecto:", projectName);
-  console.log("Valor VALIDAR:", project["VALIDAR"]);
-  console.log("isValidated:", isValidated);
-  console.log("Todas las keys:", Object.keys(project));
+  // console.log("Proyecto:", projectName);
+  // console.log("Valor VALIDAR:", project["VALIDAR"]);
+  //  console.log("isValidated:", isValidated);
+  //  console.log("Todas las keys:", Object.keys(project));
 
   return (
     <Card

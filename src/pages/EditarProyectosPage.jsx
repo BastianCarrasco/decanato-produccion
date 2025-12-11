@@ -369,7 +369,7 @@ export default function EditarProyectosPage() {
       });
 
       setProjectsData(mappedProjects);
-      console.log("Projects Data después del mapeo:", mappedProjects);
+      // console.log("Projects Data después del mapeo:", mappedProjects);
       // setAcademicosData(academicos); // Ya no se necesita mantener este estado directamente
       setUnidadesData(unidades);
       setEstatusData(estatus);
@@ -566,24 +566,24 @@ export default function EditarProyectosPage() {
   );
 
   // Helper para crear celdas truncables con un maxWidth por defecto
-  const TruncatableCell = (defaultMaxWidth) => (props) => (
-    <EditableCell {...props} isTruncatable={true} maxWidth={defaultMaxWidth} />
-  );
+  const TruncatableCell = (defaultMaxWidth) => (props) =>
+    <EditableCell {...props} isTruncatable={true} maxWidth={defaultMaxWidth} />;
 
   // Helper para crear celdas de selección truncables con opciones y maxWidth
   const TruncatableSelectCell =
-    (optionsData, valueKey, labelKey, defaultMaxWidth) => (props) => (
-      <EditableCell
-        {...props}
-        type="select"
-        options={optionsData.map((item) => ({
-          value: item[valueKey],
-          label: item[labelKey],
-        }))}
-        isTruncatable={true}
-        maxWidth={defaultMaxWidth}
-      />
-    );
+    (optionsData, valueKey, labelKey, defaultMaxWidth) => (props) =>
+      (
+        <EditableCell
+          {...props}
+          type="select"
+          options={optionsData.map((item) => ({
+            value: item[valueKey],
+            label: item[labelKey],
+          }))}
+          isTruncatable={true}
+          maxWidth={defaultMaxWidth}
+        />
+      );
 
   // Custom filter function para rangos de monto
   const filterMontoRange = useCallback((row, columnId, filterValues) => {

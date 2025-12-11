@@ -1,5 +1,5 @@
 import axios from "axios";
-console.log("BASE_URL loaded:", import.meta.env.VITE_API_BASE_URL);
+//console.log("BASE_URL loaded:", import.meta.env.VITE_API_BASE_URL);
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 const axiosClient = axios.create({

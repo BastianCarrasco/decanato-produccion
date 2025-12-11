@@ -44,7 +44,7 @@ const FONDO_LOGOS = {
   ANID: anidLogo,
   CORFO: corfoLogo,
   GORE: goreLogo,
-  Internas: internasPucvLogo,
+  INTERNAS: internasPucvLogo,
   PRIVADA: privadaLogo,
 };
 
@@ -52,7 +52,7 @@ const FONDO_URLS = {
   ANID: "https://anid.cl/",
   CORFO: "https://www.corfo.cl",
   GORE: "https://www.gobiernovalparaiso.cl/",
-  Internas: "https://www.pucv.cl/",
+  INTERNAS: "https://www.pucv.cl/",
   PRIVADA: "",
 };
 
@@ -76,7 +76,7 @@ export default function FondosPage() {
         return "bg-red-500 text-white";
       case "CORFO":
         return "bg-orange-500 text-white";
-      case "Internas":
+      case "INTERNAS":
         return "bg-blue-500 text-white";
       case "GORE":
         return "bg-purple-500 text-white";
@@ -262,7 +262,7 @@ export default function FondosPage() {
 
   const uniqueTiposFondo = useMemo(() => {
     const tiposDesdeData = fondosData.map((f) => f.tipo_nombre);
-    const tiposFijos = ["ANID", "CORFO", "GORE", "Internas", "PRIVADA"];
+    const tiposFijos = ["ANID", "CORFO", "GORE", "INTERNAS", "PRIVADA"];
     return [...new Set([...tiposDesdeData, ...tiposFijos])]
       .filter(Boolean)
       .sort();

@@ -1,7 +1,6 @@
 // src/components/FondosActivosSection.jsx
 import { useState, useEffect, useCallback } from "react";
-import fondosService from "../../api/fondos.js";
-import tipoConvocatoriaService from "../../api/tipoconvocatoria.js";
+// Eliminados: fondosService, tipoConvocatoriaService
 import { useError } from "@/contexts/ErrorContext";
 import { Spinner } from "@/components/ui/spinner";
 
@@ -15,27 +14,37 @@ import goreLogo from "../../assets/tipos_convocatorias/gore-valpo.jpg";
 import internasPucvLogo from "../../assets/tipos_convocatorias/internaspucv.svg";
 import privadaLogo from "../../assets/tipos_convocatorias/private.png";
 
+// NOTA: Ajusta las claves de FONDO_LOGOS para que coincidan con los "Tipo de Fondo"
+// directamente del JSON proporcionado.
 const FONDO_LOGOS = {
   ANID: anidLogo,
   CORFO: corfoLogo,
   GORE: goreLogo,
-  Internas: internasPucvLogo,
+  INTERNAS: internasPucvLogo, // Cambiado de 'Internas' a 'INTERNAS' para coincidir
   PRIVADA: privadaLogo,
 };
+
+const FONDOS_API_URL = import.meta.env.VITE_URL_FONDOS; // Se declara, pero no se usa para fetch directo aquí.
 
 export default function FondosActivosSection() {
   const [fondosActivos, setFondosActivos] = useState([]);
   const [loading, setLoading] = useState(true);
   const { setError } = useError();
-  const [tipoFondoMap, setTipoFondoMap] = useState({});
+  // Eliminado: tipoFondoMap, ya que el tipo de fondo viene directamente en la data
   const [currentDate, setCurrentDate] = useState(new Date());
 
   // --- Helpers ---
   const formatDate = useCallback((dateString) => {
     if (!dateString) return "Fecha no especificada";
     try {
+      // Asume formato "DD/MM/YYYY" para convertir a Date para compatibilidad
+      const [day, month, year] = dateString.split("/");
+      const date = new Date(`${year}-${month}-${day}`);
+      if (isNaN(date.getTime())) {
+        throw new Error("Invalid date format");
+      }
       const options = { year: "numeric", month: "short", day: "numeric" };
-      return new Date(dateString).toLocaleDateString("es-CL", options);
+      return date.toLocaleDateString("es-CL", options);
     } catch (e) {
       console.warn("Invalid date string:", dateString, e);
       return "Fecha inválida";
@@ -44,19 +53,25 @@ export default function FondosActivosSection() {
 
   const isFondoVigente = useCallback(
     (fondo) => {
-      if (!fondo.inicio || !fondo.cierre) return false;
+      // Usar los nuevos nombres de claves: "Fecha Inicio", "Fecha Termino"
+      if (!fondo["Fecha Inicio"] || !fondo["Fecha Termino"]) return false;
 
       const hoy = currentDate;
-      const hoyUTC = new Date(hoy.toISOString().slice(0, 10));
-      hoyUTC.setUTCHours(0, 0, 0, 0);
+      // Convertir "DD/MM/YYYY" a formato Date
+      const [inicioDay, inicioMonth, inicioYear] =
+        fondo["Fecha Inicio"].split("/");
+      const inicioFondo = new Date(`${inicioYear}-${inicioMonth}-${inicioDay}`);
 
-      const inicioFondoUTC = new Date(fondo.inicio);
-      const cierreFondoUTC = new Date(fondo.cierre);
+      const [cierreDay, cierreMonth, cierreYear] =
+        fondo["Fecha Termino"].split("/");
+      const cierreFondo = new Date(`${cierreYear}-${cierreMonth}-${cierreDay}`);
 
-      inicioFondoUTC.setUTCHours(0, 0, 0, 0);
-      cierreFondoUTC.setUTCHours(23, 59, 59, 999);
+      // Asegurarse de que las horas sean correctas para la comparación
+      inicioFondo.setHours(0, 0, 0, 0);
+      cierreFondo.setHours(23, 59, 59, 999);
+      hoy.setHours(0, 0, 0, 0);
 
-      return hoyUTC >= inicioFondoUTC && hoyUTC <= cierreFondoUTC;
+      return hoy >= inicioFondo && hoy <= cierreFondo;
     },
     [currentDate]
   );
@@ -65,22 +80,15 @@ export default function FondosActivosSection() {
     (cierreDateString) => {
       if (!cierreDateString) return null;
 
-      const cierre = new Date(cierreDateString);
-      cierre.setHours(23, 59, 59, 999);
+      // Convertir "DD/MM/YYYY" a formato Date
+      const [day, month, year] = cierreDateString.split("/");
+      const cierre = new Date(`${year}-${month}-${day}`);
+      cierre.setHours(23, 59, 59, 999); // Establecer al final del día de cierre
 
-      const hoy = currentDate;
-      const hoyInicioDia = new Date(
-        hoy.getFullYear(),
-        hoy.getMonth(),
-        hoy.getDate()
-      );
-      const cierreInicioDia = new Date(
-        cierre.getFullYear(),
-        cierre.getMonth(),
-        cierre.getDate()
-      );
+      const hoy = new Date(); // Nueva instancia para evitar modificar currentDate directamente
+      hoy.setHours(0, 0, 0, 0); // Establecer al inicio del día actual
 
-      const diffTime = cierreInicioDia.getTime() - hoyInicioDia.getTime();
+      const diffTime = cierre.getTime() - hoy.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
       if (diffDays === 0) return { text: "Cierra hoy", urgent: true };
@@ -90,7 +98,7 @@ export default function FondosActivosSection() {
       if (diffDays > 7) return { text: `${diffDays} días`, urgent: false };
       return null;
     },
-    [currentDate]
+    [] // No depende de currentDate en este caso, usa new Date() internamente
   );
 
   // Función para obtener el renderizable del "logo"
@@ -122,35 +130,85 @@ export default function FondosActivosSection() {
     }
   }, []);
 
-  // --- Fetching de datos ---
+  // --- Fetching de datos (ahora usa datos estáticos) ---
   const fetchAllData = async () => {
     setLoading(true);
     setError(null);
     try {
-      const tiposResponse =
-        await tipoConvocatoriaService.getAllTiposConvocatoria();
-      const newTipoFondoMap = tiposResponse.reduce((map, tipo) => {
-        map[tipo.id] = tipo.nombre;
-        return map;
-      }, {});
-      setTipoFondoMap(newTipoFondoMap);
+      // Datos estáticos proporcionados
+      const staticFondosData = {
+        ok: true,
+        count: 3,
+        data: [
+          {
+            _id: "693a85d28010d9e46de9045a",
+            Nombre: "Concurso IDeA I+D 2026",
+            "Tipo de Fondo": "ANID",
+            TRL: 2,
+            "Financiamiento MM": 227,
+            "Fecha Inicio": "29/06/2025",
+            "Fecha Termino": "30/08/2025",
+            Requisitos: null,
+            Objetivo:
+              "Apoya el cofinanciamiento de proyectos de I+D aplicada con un fuerte componente científico, para que desarrollen tecnologías que puedan convertirse en nuevos productos, procesos o servicios, con una razonable probabilidad de generación de impactos productivos, económicos y sociales.",
+            Duración: "24 meses",
+            VALIDAR: true,
+          },
+          {
+            _id: "693a85d28010d9e46de9045b",
+            Nombre: "Convocatoria Crea y Valida",
+            "Tipo de Fondo": "CORFO",
+            TRL: null,
+            "Financiamiento MM": "180 - 220",
+            "Fecha Inicio": "28/02/2025",
+            "Fecha Termino": "30/04/2025",
+            Requisitos: null,
+            Objetivo:
+              'El programa "Crea y Valida" tiene como propósito apoyar el desarrollo de nuevos o mejorados productos (bienes o servicios) y/o procesos, que requieran I+D, desde la fase de prototipo hasta la fase de validación técnica a escala productiva y/o validación comercial. Su objetivo es fortalecer las capacidades de innovación en empresas chilenas.',
+            Duración: "24 meses",
+            VALIDAR: true,
+          },
+          {
+            _id: "693a85d28010d9e46de9045c",
+            Nombre: "DI Regular PUCV",
+            "Tipo de Fondo": "INTERNAS",
+            TRL: null,
+            "Financiamiento MM": 3.3,
+            "Fecha Inicio": "28/03/2025",
+            "Fecha Termino": "31/03/2025",
+            Requisitos:
+              "6.1 Publicar un paper WoS, Q1 o Q2, u otra alternativa de productividad científica equivalente.\r\n6.2 Participar como evaluador/a en concursos de la Dirección de Investigación.\r\n6.3 Colaborar en actividades de la Dirección de Investigación.\r\n6.4 Involucrar estudiantes PUCV (tesistas de pre/postgrado).\r\n6.5 Incluir agradecimientos a VINCI-DI PUCV en la productividad científica.\r\n6.6 Postular a FONDECYT 2025 u otro proyecto similar en 2024.\r\n6.7 Generar difusión en medios/RRSS destacando el aporte PUCV.",
+            Objetivo:
+              "Incentivar a académicos/as con trayectoria investigadora en la PUCV que hayan finalizado proyectos FONDECYT (inicio/regular), FONDEF, o similares, y desean preparar una nueva postulación a esos concursos, o a proyectos similares.",
+            Duración: "10 meses",
+            VALIDAR: true,
+          },
+        ],
+        message:
+          "✅ Documentos de fondos recuperados correctamente de FONDOS_EXEL.",
+      };
 
-      const fondosResponse = await fondosService.getAllFondos();
+      const fondosResponseData = staticFondosData.data;
 
-      const processedAndFilteredFondos = fondosResponse
-        .map((fondo) => {
-          fondo["tipo de fondo"] = newTipoFondoMap[fondo.tipo] || "Desconocido";
-          return fondo;
-        })
+      // Mapea los fondos para estandarizar los nombres de las propiedades si es necesario
+      // y filtra por vigencia. La propiedad "Tipo de Fondo" ya está lista.
+      const processedAndFilteredFondos = fondosResponseData
+        .map((fondo) => ({
+          id: fondo._id, // Usar _id como id
+          nombre: fondo.Nombre,
+          tipo: fondo["Tipo de Fondo"], // Renombrado para coincidir con la UI
+          financiamiento: fondo["Financiamiento MM"], // Renombrado
+          inicio: fondo["Fecha Inicio"], // Renombrado
+          cierre: fondo["Fecha Termino"], // Renombrado
+          objetivo: fondo.Objetivo,
+          // ... otras propiedades que quieras mantener o renombrar
+        }))
         .filter((fondo) => isFondoVigente(fondo));
 
       setFondosActivos(processedAndFilteredFondos);
     } catch (e) {
-      console.error("Error fetching data for Fondos Activos:", e);
-      setError(
-        e.message ||
-          "Error desconocido al cargar los fondos activos y sus tipos."
-      );
+      console.error("Error cargando los fondos activos:", e);
+      setError(e.message || "Error desconocido al cargar los fondos activos.");
     } finally {
       setLoading(false);
     }
@@ -158,15 +216,12 @@ export default function FondosActivosSection() {
 
   useEffect(() => {
     fetchAllData();
-    const timer = setInterval(
-      () => {
-        setCurrentDate(new Date());
-      },
-      1000 * 60 * 60 * 24
-    );
+    const timer = setInterval(() => {
+      setCurrentDate(new Date());
+    }, 1000 * 60 * 60 * 24); // Actualiza cada día
 
     return () => clearInterval(timer);
-  }, []);
+  }, [isFondoVigente]); // Añadir isFondoVigente como dependencia para asegurar re-evaluación
 
   return (
     <div className="h-full bg-white/10 backdrop-blur-lg rounded-2xl shadow-xl border border-white/50 p-6">
@@ -204,8 +259,9 @@ export default function FondosActivosSection() {
       ) : (
         <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-blue-300 scrollbar-track-transparent">
           {fondosActivos.map((fondo, index) => {
+            // Usa fondo.cierre para getDaysRemaining
             const daysRemaining = getDaysRemaining(fondo.cierre);
-            
+
             return (
               <div
                 key={fondo.id}
@@ -223,7 +279,7 @@ export default function FondosActivosSection() {
 
                 <div className="flex items-start gap-3">
                   {/* Logo con efecto de brillo */}
-                  {renderFondoIconOrLogo(fondo["tipo de fondo"])}
+                  {renderFondoIconOrLogo(fondo.tipo)}
 
                   <div className="flex-grow min-w-0">
                     {/* Nombre del fondo */}
@@ -232,10 +288,10 @@ export default function FondosActivosSection() {
                     </h4>
 
                     {/* Tipo de fondo */}
-                    {fondo["tipo de fondo"] && (
+                    {fondo.tipo && (
                       <div className="inline-block px-2 py-0.5 bg-blue-100/80 backdrop-blur-sm rounded-md mb-2">
                         <p className="text-[0.65rem] text-[#2E5C8A] font-medium uppercase tracking-wide">
-                          {fondo["tipo de fondo"]}
+                          {fondo.tipo}
                         </p>
                       </div>
                     )}
@@ -282,7 +338,8 @@ export default function FondosActivosSection() {
                         : "bg-gradient-to-r from-[#2E5C8A] to-[#4A90D9]"
                     }`}
                     style={{
-                      width: daysRemaining && daysRemaining.urgent ? "100%" : "60%",
+                      width:
+                        daysRemaining && daysRemaining.urgent ? "100%" : "60%",
                     }}
                   ></div>
                 </div>

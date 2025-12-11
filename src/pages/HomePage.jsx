@@ -1,19 +1,18 @@
 // src/pages/HomePage.jsx
 import { Button } from "@/components/ui/button";
-import funcionesService from "../api/funciones.js";
-import estudiantesService from "../api/estudiantes.js";
+// Los servicios de API han sido eliminados según tu solicitud
+// import funcionesService from "../api/funciones.js";
+// import estudiantesService from "../api/estudiantes.js";
 import FondosActivosSection from "../pages/components/FondosActivosSection";
-import estadisticasService from "../api/estadisticas.js";
-import analisisService from "../api/analisisService.js"; // <-- Importa el nuevo servicio
+// import estadisticasService from "../api/estadisticas.js";
+// import analisisService from "../api/analisisService.js";
 import { useState, useEffect } from "react";
-import { useProyectos } from "@/contexts/ProyectosContext";
+// useProyectos no se usa directamente para setProyectosContexto si se elimina la lógica de fetching detallado.
+// Considera si este context aún es necesario en HomePage sin la lógica de proyectos detallados.
+// import { useProyectos } from "@/contexts/ProyectosContext";
 import { Spinner } from "@/components/ui/spinner";
 
 import {
-  BarChart3,
-  FolderPlus,
-  PenTool,
-  Plus,
   ArrowRight,
   ContactRound,
   FolderOpen,
@@ -21,35 +20,132 @@ import {
   FileDown,
   Copy,
   TrendingUp,
-  Activity,
   FileText,
   Sheet,
   Zap,
 } from "lucide-react";
 
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom"; // Se mantiene por si se usa en el futuro para navegación.
 import { useError } from "@/contexts/ErrorContext";
 import { useExportData } from "@/hooks/useExportDataCartera";
 
 const FORMULARIO_PERFIL_URL =
   "https://formularioproyectos-production.up.railway.app/";
 
+// La URL del análisis se declara pero no se usa para fetch directo en este componente.
+// Se asume que los datos de análisis se obtendrán de otra manera (ej. prop, contexto).
+const ANALISIS_URL = import.meta.env.VITE_URL_ANALISIS;
+
 export default function HomePage() {
-  const { proyectosContexto, setProyectosContexto } = useProyectos();
+  // setProyectosContexto ya no es necesario si no se fetch data detallada aquí.
+  // const { setProyectosContexto } = useProyectos();
   const navigate = useNavigate();
-  const [proyectosCrudosData, setProyectosCrudosData] = useState([]);
-  const [proyectosProfesorData, setProyectosProfesorData] = useState([]);
-  const [loadingQuickStats, setLoadingQuickStats] = useState(true);
+  const [loadingQuickStats, setLoadingQuickStats] = useState(false); // Cambiado a false ya que no hay fetching aquí.
   const { setError } = useError();
   const [copiedMessage, setCopiedMessage] = useState(false);
 
-  // Nuevo estado para almacenar los datos del análisis
-  const [analisisData, setAnalisisData] = useState(null);
+  // ESTADO CLAVE: Aquí es donde esperarías que llegara el 'analisisData'.
+  // Para que esto funcione, DEBES asegurarte de que 'analisisData' sea poblado
+  // desde otro lugar, por ejemplo, un contexto, un prop o un fetch externo.
+  // Para propósitos de esta demostración, lo inicializaré con la estructura
+  // JSON que proporcionaste para que la UI no rompa, pero recuerda que esto sería data estática.
+  const [analisisData, setAnalisisData] = useState({
+    ok: true,
+    message:
+      "Análisis completo de proyectos en EXCEL-BUN: Conteo total, temáticas, estatus, tipo de apoyo, unidades académicas, tipos/instituciones de convocatoria y total de académicos únicos.",
+    totalProyectos: 44,
+    tematicas: {
+      totalTematicasDistintas: 23,
+      datos: [
+        { nombre: "Hidrógeno", cantidad: 5 },
+        { nombre: "Economía Circular", cantidad: 5 },
+        { nombre: "Interdisciplina", cantidad: 3 },
+        { nombre: "Minería", cantidad: 3 },
+        { nombre: "Alimentos", cantidad: 3 },
+        { nombre: "Litio", cantidad: 2 },
+        { nombre: "Realidad Virtual", cantidad: 2 },
+        { nombre: "Salud", cantidad: 2 },
+        { nombre: "Gemelos Digitales", cantidad: 2 },
+        { nombre: "Biotecnología", cantidad: 2 },
+        { nombre: "Seguridad", cantidad: 2 },
+        { nombre: "Sin Temática", cantidad: 2 },
+        { nombre: "Educación de Ingeniería", cantidad: 1 },
+        { nombre: "Almacenamiento Energía", cantidad: 1 },
+        { nombre: "Recursos hídricos", cantidad: 1 },
+        { nombre: "Astronomia", cantidad: 1 },
+        { nombre: "Género", cantidad: 1 },
+        { nombre: "Telecomunicaciones", cantidad: 1 },
+        { nombre: "Contaminación Lumínica", cantidad: 1 },
+        { nombre: "LegalTech", cantidad: 1 },
+        { nombre: "Medioambiente", cantidad: 1 },
+        { nombre: "Educación", cantidad: 1 },
+        { nombre: "Recursos Hídricos", cantidad: 1 },
+      ],
+    },
+    estatus: {
+      totalEstatusDistintos: 4,
+      datos: [
+        { nombre: "Perfil", cantidad: 21 },
+        { nombre: "Postulado", cantidad: 18 },
+        { nombre: "Adjudicado", cantidad: 3 },
+        { nombre: "No postulado", cantidad: 2 },
+      ],
+    },
+    tipoApoyo: {
+      totalTiposApoyoDistintos: 2,
+      datos: [
+        { nombre: "Parcial", cantidad: 33 },
+        { nombre: "Total", cantidad: 11 },
+      ],
+    },
+    unidadesAcademicas: {
+      totalUnidadesDistintas: 9,
+      datos: [
+        { nombre: "Facultad de Ingeniería", cantidad: 9 },
+        { nombre: "Escuela de Ingeniería Química", cantidad: 7 },
+        { nombre: "Escuela de Ingeniería Civil", cantidad: 7 },
+        { nombre: "Escuela de Ingeniería Eléctrica", cantidad: 6 },
+        { nombre: "Escuela de Ingeniería Informática", cantidad: 6 },
+        { nombre: "Escuela de Ingeniería Bioquímica", cantidad: 5 },
+        { nombre: "Escuela de Ingeniería Mecánica", cantidad: 3 },
+        { nombre: "Escuela de Ingeniería Industrial", cantidad: 2 },
+        { nombre: "Escuela de Ingeniería Comercial", cantidad: 1 },
+      ],
+    },
+    tipoConvocatoria: {
+      totalTiposConvocatoriaDistintos: 6,
+      datos: [
+        { nombre: "NINGUNA", cantidad: 15 },
+        { nombre: "ANID", cantidad: 13 },
+        { nombre: "CORFO", cantidad: 6 },
+        { nombre: "PRIVADA", cantidad: 5 },
+        { nombre: "GORE", cantidad: 4 },
+        { nombre: "INTERNA", cantidad: 1 },
+      ],
+    },
+    institucionConvocatoria: {
+      totalInstitucionesConvocatoriaDistintas: 10,
+      datos: [
+        { nombre: "Sin institucion de convocatoria", cantidad: 15 },
+        { nombre: "ANID", cantidad: 8 },
+        { nombre: "PUCV", cantidad: 6 },
+        { nombre: "CORFO", cantidad: 5 },
+        { nombre: "GORE-Valparaíso", cantidad: 4 },
+        { nombre: "SQM", cantidad: 2 },
+        { nombre: "CODESSER", cantidad: 1 },
+        { nombre: "LACNIC", cantidad: 1 },
+        { nombre: "CORFO - Magallanes", cantidad: 1 },
+        { nombre: "ARMADA DE CHILE", cantidad: 1 },
+      ],
+    },
+    academicos: {
+      totalAcademicosUnicos: 24,
+    },
+  });
 
   const { loadingExportPDF, loadingExportExcel, generarPDF, generarExcel } =
     useExportData();
 
-  // Ahora, estos valores se obtendrán de analisisData
   const proyectosEnCartera = analisisData?.totalProyectos || 0;
   const postuladosCount =
     analisisData?.estatus?.datos?.find((e) => e.nombre === "Postulado")
@@ -58,78 +154,8 @@ export default function HomePage() {
     analisisData?.estatus?.datos?.find((e) => e.nombre === "Perfil")
       ?.cantidad || 0;
 
-  const fetchData = async () => {
-    setLoadingQuickStats(true);
-    setError(null);
-    try {
-      const [
-        projectsResponse,
-        academicosResponse,
-        profProjectsResponse,
-        analisisResponse, // <-- Nueva llamada al servicio de análisis
-      ] = await Promise.all([
-        funcionesService.getDataInterseccionProyectos(),
-        funcionesService.getAcademicosPorProyecto(),
-        estadisticasService.getAcademicosPorUnidad(),
-        analisisService.getAnalisisProyectos(), // <-- Llama al nuevo servicio
-      ]);
-
-      const projects = Array.isArray(projectsResponse) ? projectsResponse : [];
-      const academicosPorProyecto = Array.isArray(academicosResponse)
-        ? academicosResponse
-        : [];
-
-      const newAcademicosMap = academicosPorProyecto.reduce((map, item) => {
-        map[item.id_proyecto] = item;
-        return map;
-      }, {});
-
-      const estudiantesPromises = projects.map(async (project) => {
-        try {
-          const estudiantes =
-            await estudiantesService.getEstudiantesPorProyecto(
-              project.id_proyecto
-            );
-          return { id_proyecto: project.id_proyecto, estudiantes };
-        } catch (e) {
-          console.error(
-            `Error al obtener estudiantes para proyecto ${project.id_proyecto}:`,
-            e
-          );
-          return { id_proyecto: project.id_proyecto, estudiantes: [] };
-        }
-      });
-
-      const estudiantesResponses = await Promise.all(estudiantesPromises);
-
-      const newEstudiantesMap = estudiantesResponses.reduce((map, item) => {
-        map[item.id_proyecto] = item.estudiantes;
-        return map;
-      }, {});
-
-      const projectsWithAcademicosAndEstudiantes = projects.map((project) => ({
-        ...project,
-        academicos: newAcademicosMap[project.id_proyecto]?.profesores || [],
-        estudiantes: newEstudiantesMap[project.id_proyecto] || [],
-      }));
-
-      setProyectosContexto(projectsWithAcademicosAndEstudiantes);
-      setProyectosCrudosData(projects);
-      setProyectosProfesorData(
-        Array.isArray(profProjectsResponse) ? profProjectsResponse : []
-      );
-      setAnalisisData(analisisResponse); // <-- Guarda los datos del análisis
-    } catch (e) {
-      console.error("Error fetching data for dashboard summary:", e);
-      setError(e.message || "Error desconocido al cargar los datos.");
-    } finally {
-      setLoadingQuickStats(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
+  // fetchData ya no es necesaria aquí si no se hace fetching.
+  // useEffect ya no es necesario si no se hace fetching.
 
   const handleCopyLinkFormulario = async () => {
     try {

@@ -3,26 +3,13 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import {
   Search,
-  ChevronDown, // Ya no la necesitamos importar explícitamente si Shadcn la inyecta
   Target,
   ClipboardList,
   Calendar,
-  RotateCcw,
+  RotateCcw, // Icono para recargar
   XCircle,
-  Plus,
   Info,
-  Trash2,
 } from "lucide-react";
-
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 
 import { Textarea } from "@/components/ui/textarea.jsx";
 
@@ -45,22 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-
 import { useError } from "@/contexts/ErrorContext";
-
-import fondosService from "../api/fondos.js";
-import tipoConvocatoriaService from "../api/tipoconvocatoria.js";
 
 import anidLogo from "../assets/tipos_convocatorias/anid_rojo_azul.png";
 import corfoLogo from "../assets/tipos_convocatorias/corfo2024.png";
@@ -84,6 +56,9 @@ const FONDO_URLS = {
   PRIVADA: "",
 };
 
+const FONDOS_API_URL = import.meta.env.VITE_URL_FONDOS;
+const SYNC_API_URL = `${FONDOS_API_URL}sync`; // Nueva URL para la sincronización
+
 export default function FondosPage() {
   const [fondosData, setFondosData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -94,35 +69,6 @@ export default function FondosPage() {
   const [filterTrl, setFilterTrl] = useState("todos");
   const [filterEstado, setFilterEstado] = useState("todos");
   const [searchTerm, setSearchTerm] = useState("");
-
-  const [tipoConvocatoriaMap, setTipoConvocatoriaMap] = useState({});
-  const [tiposConvocatoriaList, setTiposConvocatoriaList] = useState([]);
-
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [newFondoName, setNewFondoName] = useState("");
-  const [newFondoInicio, setNewFondoInicio] = useState("");
-  const [newFondoCierre, setNewFondoCierre] = useState("");
-  const [newFondoFinanciamiento, setNewFondoFinanciamiento] = useState("");
-  const [newFondoPlazo, setNewFondoPlazo] = useState("");
-  const [newFondoObjetivo, setNewFondoObjetivo] = useState("");
-  const [newFondoTrl, setNewFondoTrl] = useState("");
-  const [newFondoReq, setNewFondoReq] = useState("");
-  const [newFondoTipo, setNewFondoTipo] = useState("");
-
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [fondoAEliminar, setFondoAEliminar] = useState(null);
-
-  const resetNewFondoForm = () => {
-    setNewFondoName("");
-    setNewFondoInicio("");
-    setNewFondoCierre("");
-    setNewFondoFinanciamiento("");
-    setNewFondoPlazo("");
-    setNewFondoObjetivo("");
-    setNewFondoTrl("");
-    setNewFondoReq("");
-    setNewFondoTipo("");
-  };
 
   const getTipoFondoColor = useCallback((tipoFondoNombre) => {
     switch (tipoFondoNombre) {
@@ -160,15 +106,30 @@ export default function FondosPage() {
   }, []);
 
   const getTRLColor = (trl) => {
-    if (trl === "Sin información") return "bg-gray-500 text-white";
+    if (trl === null || trl === "Sin información" || trl === "")
+      return "bg-gray-500 text-white";
     return "bg-green-500 text-white";
+  };
+
+  const parseDateDDMMYYYY = (dateString) => {
+    if (!dateString) return null;
+    const parts = dateString.split("/").map(Number);
+    if (parts.length === 3) {
+      return new Date(parts[2], parts[1] - 1, parts[0]);
+    }
+    return null;
   };
 
   const formatDate = useCallback((dateString) => {
     if (!dateString) return "Sin fecha";
     try {
-      const date = new Date(dateString);
-      if (isNaN(date)) return "Fecha Inválida";
+      let date = parseDateDDMMYYYY(dateString);
+
+      if (!date || isNaN(date.getTime())) {
+        date = new Date(dateString);
+      }
+
+      if (isNaN(date.getTime())) return "Fecha Inválida";
       const options = { year: "numeric", month: "long", day: "numeric" };
       return date.toLocaleDateString("es-CL", options);
     } catch (e) {
@@ -177,17 +138,21 @@ export default function FondosPage() {
     }
   }, []);
 
-  const isFondoVigente = useCallback((fondo) => {
-    if (!fondo.inicio || !fondo.cierre) return false;
+  const isFondoVigente = useCallback((fechaCierreStr) => {
+    if (!fechaCierreStr) return false;
+    const fechaCierre = parseDateDDMMYYYY(fechaCierreStr);
+    if (!fechaCierre || isNaN(fechaCierre.getTime())) return false;
+
     const hoy = new Date();
-    const inicio = new Date(fondo.inicio);
-    const cierre = new Date(fondo.cierre);
-    cierre.setHours(23, 59, 59, 999);
-    return hoy >= inicio && hoy <= cierre;
+    fechaCierre.setHours(23, 59, 59, 999);
+
+    return hoy <= fechaCierre;
   }, []);
 
-  const getEstadoBadgeColor = useCallback((isVigente) => {
-    return isVigente ? "bg-green-500 text-white" : "bg-red-500 text-white";
+  const getEstadoBadgeColor = useCallback((estadoVigencia) => {
+    return estadoVigencia === "Vigente"
+      ? "bg-green-500 text-white"
+      : "bg-red-500 text-white";
   }, []);
 
   const fetchAllFondosData = async () => {
@@ -195,40 +160,74 @@ export default function FondosPage() {
     setErrorLocal(null);
     setErrorGlobal(null);
     try {
-      const [fondosResponse, tiposConvocatoriaResponse] = await Promise.all([
-        fondosService.getAllFondos(),
-        tipoConvocatoriaService.getAllTiposConvocatoria(),
-      ]);
-
-      const newTipoConvocatoriaMap = {};
-      const newTiposConvocatoriaList = [];
-      tiposConvocatoriaResponse.forEach((tipo) => {
-        newTipoConvocatoriaMap[tipo.id] = tipo.nombre;
-        newTiposConvocatoriaList.push(tipo);
+      // 1. Eliminar todos los fondos existentes
+      const deleteResponse = await fetch(FONDOS_API_URL, {
+        method: "DELETE",
       });
-      setTipoConvocatoriaMap(newTipoConvocatoriaMap);
-      setTiposConvocatoriaList(newTiposConvocatoriaList);
+      if (!deleteResponse.ok) {
+        throw new Error(
+          `HTTP error al eliminar! status: ${deleteResponse.status}`
+        );
+      }
+      console.log("Fondos eliminados exitosamente.");
+
+      // 2. Sincronizar (POST)
+      const syncResponse = await fetch(SYNC_API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({}), // Puedes enviar un cuerpo vacío si la API lo permite, o datos específicos si es necesario
+      });
+      if (!syncResponse.ok) {
+        throw new Error(
+          `HTTP error al sincronizar! status: ${syncResponse.status}`
+        );
+      }
+      console.log("Sincronización completada exitosamente.");
+
+      // 3. Obtener los fondos actualizados
+      const response = await fetch(FONDOS_API_URL);
+      if (!response.ok) {
+        throw new Error(
+          `HTTP error al obtener fondos! status: ${response.status}`
+        );
+      }
+      const data = await response.json();
+      const fondosResponse = data.data || [];
 
       const processedFondos = fondosResponse.map((fondo) => {
-        const tipoNombre = newTipoConvocatoriaMap[fondo.tipo] || "Desconocido";
-        const estadoVigente = isFondoVigente(fondo) ? "Vigente" : "Finalizado";
+        const tipoNombre = fondo["Tipo de Fondo"] || "Desconocido";
+        const idFondo = fondo._id?.$oid || fondo._id;
+
+        const estadoVigenciaCalculado = isFondoVigente(fondo["Fecha Termino"])
+          ? "Vigente"
+          : "Finalizado";
 
         return {
-          ...fondo,
+          id: idFondo,
+          nombre: fondo.Nombre,
           tipo_nombre: tipoNombre,
-          estado_vigencia: estadoVigente,
+          trl: fondo.TRL,
+          financiamiento: fondo["Financiamiento MM"],
+          inicio: fondo["Fecha Inicio"],
+          cierre: fondo["Fecha Termino"],
+          objetivo: fondo.Objetivo,
+          req: fondo.Requisitos,
+          duracion: fondo.Duración,
+          estado_vigencia: estadoVigenciaCalculado,
         };
       });
 
       setFondosData(processedFondos);
     } catch (err) {
-      console.error("Error fetching fondos data:", err);
+      console.error("Error al gestionar fondos:", err);
       setErrorGlobal({
         type: "error",
-        title: "Error al cargar los fondos.",
+        title: "Error al cargar/sincronizar los fondos.",
       });
       setErrorLocal(
-        "No se pudieron cargar los fondos. Inténtelo de nuevo más tarde."
+        `No se pudieron cargar ni sincronizar los fondos: ${err.message}. Inténtelo de nuevo más tarde.`
       );
     } finally {
       setLoading(false);
@@ -238,94 +237,6 @@ export default function FondosPage() {
   useEffect(() => {
     fetchAllFondosData();
   }, []);
-
-  const handleCreateFondo = async () => {
-    if (!newFondoName.trim()) {
-      setErrorLocal("El nombre del fondo es obligatorio.");
-      return;
-    }
-    if (!newFondoTipo) {
-      setErrorLocal("El tipo de fondo es obligatorio.");
-      return;
-    }
-
-    setLoading(true);
-    setErrorLocal(null);
-
-    const dataToSend = {
-      nombre: newFondoName.trim(),
-      inicio: newFondoInicio || null,
-      cierre: newFondoCierre || null,
-      financiamiento: newFondoFinanciamiento.trim(),
-      plazo: newFondoPlazo.trim(),
-      objetivo: newFondoObjetivo.trim(),
-      trl: newFondoTrl !== "" ? Number(newFondoTrl) : null,
-      req: newFondoReq.trim(),
-      tipo: Number(newFondoTipo),
-      crl: null,
-      team: null,
-      brl: null,
-      iprl: null,
-      frl: null,
-    };
-
-    try {
-      await fondosService.crearFondo(dataToSend);
-      setTimeout(() => {
-        setErrorGlobal({
-          type: "success",
-          title: "Fondo creado exitosamente!",
-        });
-      }, 3000);
-      resetNewFondoForm();
-      setIsCreateModalOpen(false);
-      await fetchAllFondosData();
-    } catch (err) {
-      console.error("Error al crear fondo:", err);
-      setErrorLocal("Error al crear el fondo. Inténtalo de nuevo.");
-      setErrorGlobal({
-        type: "error",
-        title: "Error al crear fondo.",
-        description: "No se pudo crear el fondo. Inténtalo de nuevo más tarde.",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDeleteFondoConfirm = useCallback(async () => {
-    if (!fondoAEliminar) return;
-
-    setLoading(true);
-    setErrorLocal(null);
-
-    try {
-      await fondosService.eliminarFondo(fondoAEliminar.id);
-      console.log(
-        `Fondo ${fondoAEliminar.id} (${fondoAEliminar.nombre}) eliminado.`
-      );
-      setTimeout(() => {
-        setErrorGlobal({
-          type: "success",
-          title: "Fondo eliminado exitosamente!",
-        });
-      }, 3000);
-      setIsDeleteDialogOpen(false);
-      setFondoAEliminar(null);
-      await fetchAllFondosData();
-    } catch (err) {
-      console.error("Error al eliminar fondo:", err);
-      setErrorLocal("Error al eliminar el fondo. Inténtalo de nuevo.");
-      setErrorGlobal({
-        type: "error",
-        title: "Error al eliminar fondo.",
-        description:
-          "No se pudo eliminar el fondo. Inténtalo de nuevo más tarde.",
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [fondoAEliminar, setErrorGlobal]);
 
   const filteredFondos = useMemo(() => {
     return fondosData.filter((fondo) => {
@@ -346,7 +257,9 @@ export default function FondosPage() {
   }, [fondosData, filterTipoFondo, filterTrl, filterEstado, searchTerm]);
 
   const uniqueTiposFondo = useMemo(() => {
-    return [...new Set(fondosData.map((f) => f.tipo_nombre))]
+    const tiposDesdeData = fondosData.map((f) => f.tipo_nombre);
+    const tiposFijos = ["ANID", "CORFO", "GORE", "Internas", "PRIVADA"];
+    return [...new Set([...tiposDesdeData, ...tiposFijos])]
       .filter(Boolean)
       .sort();
   }, [fondosData]);
@@ -375,7 +288,6 @@ export default function FondosPage() {
   return (
     <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Título principal */}
         <div className="mb-8 flex justify-between items-center">
           <div>
             <h2 className="text-3xl font-bold text-gray-900">
@@ -386,23 +298,17 @@ export default function FondosPage() {
               financiar tus proyectos
             </p>
           </div>
-          {/* Botón para crear fondo */}
           <Button
             className="bg-blue-600  cursor-pointer text-white hover:bg-blue-700"
-            onClick={() => {
-              resetNewFondoForm();
-              setIsCreateModalOpen(true);
-            }}
+            onClick={fetchAllFondosData}
           >
-            <Plus className="w-4 h-4 mr-2" />
-            Crear Fondo
+            <RotateCcw className="w-4 h-4 mr-2" />
+            Recargar Tabla
           </Button>
         </div>
 
-        {/* Filtros */}
         <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-            {/* Tipo de Fondo */}
             <div>
               <label
                 htmlFor="filterTipoFondo"
@@ -428,7 +334,6 @@ export default function FondosPage() {
               </Select>
             </div>
 
-            {/* TRL */}
             <div>
               <label
                 htmlFor="filterTrl"
@@ -451,7 +356,6 @@ export default function FondosPage() {
               </Select>
             </div>
 
-            {/* Estado */}
             <div>
               <label
                 htmlFor="filterEstado"
@@ -474,7 +378,6 @@ export default function FondosPage() {
               </Select>
             </div>
 
-            {/* Búsqueda */}
             <div className="col-span-full sm:col-span-2 md:col-span-1 lg:col-span-2 xl:col-span-1">
               <label
                 htmlFor="searchTerm"
@@ -495,7 +398,6 @@ export default function FondosPage() {
               </div>
             </div>
 
-            {/* Botón Reiniciar Filtros */}
             <div className="col-span-full sm:col-span-2 md:col-span-3 lg:col-span-1 flex items-end justify-end">
               <Button
                 onClick={resetFilters}
@@ -508,7 +410,6 @@ export default function FondosPage() {
           </div>
         </div>
 
-        {/* Loading / Error / No Results */}
         {loading ? (
           <div className="flex flex-col items-center justify-center p-8 bg-white rounded-lg shadow-sm">
             <Spinner size={48} className="text-blue-600 mb-4" />
@@ -532,23 +433,17 @@ export default function FondosPage() {
           </Alert>
         ) : (
           <>
-            {/* Headers de columna */}
             <div className="bg-white rounded-t-lg shadow-lg hidden md:block">
-              {/* Ajustamos el grid-cols para dar espacio a la flecha y el botón */}
-              <div className="grid grid-cols-[1fr_0.8fr_0.5fr_0.8fr_0.8fr_0.8fr_auto_auto] gap-4 p-4 bg-gray-100 border-b border-gray-200 font-semibold text-gray-700 text-sm items-center">
+              <div className="grid grid-cols-[1fr_0.8fr_0.5fr_0.8fr_0.8fr_0.8fr_auto] gap-4 p-4 bg-gray-100 border-b border-gray-200 font-semibold text-gray-700 text-sm items-center">
                 <div className="text-left">Nombre del Fondo</div>
                 <div className="text-center">Tipo de Fondo</div>
                 <div className="text-center">TRL</div>
                 <div className="text-center">Financiamiento</div>
                 <div className="text-center">Duración</div>
                 <div className="text-center">Estado</div>
-                <div className="text-center"></div>{" "}
-                {/* Columna para la flecha */}
-                <div className="text-center"></div>{" "}
-                {/* Columna para el botón */}
+                <div className="text-center"></div>
               </div>
             </div>
-            {/* Lista de fondos */}
             <div className="bg-white rounded-b-lg shadow-lg overflow-hidden">
               <Accordion type="single" collapsible className="w-full">
                 {filteredFondos.map((fondo) => (
@@ -557,7 +452,6 @@ export default function FondosPage() {
                     key={fondo.id}
                     className="border-b border-gray-200"
                   >
-                    {/* Fila principal */}
                     <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr_1fr_1fr_auto] items-center py-2 px-6 gap-4 group hover:bg-gray-50 transition-colors">
                       <AccordionTrigger className="flex items-center gap-2 text-left">
                         {renderTipoFondoLogo(fondo.tipo_nombre)}
@@ -568,17 +462,19 @@ export default function FondosPage() {
                       </AccordionTrigger>
                       <div className="text-center">
                         <span
-                          className={`px-3 py-1 rounded-full text-xs font-bold ${getTipoFondoColor(fondo.tipo_nombre)}`}
+                          className={`px-3 py-1 rounded-full text-xs font-bold ${getTipoFondoColor(
+                            fondo.tipo_nombre
+                          )}`}
                         >
                           {fondo.tipo_nombre}
                         </span>
                         {FONDO_URLS[fondo.tipo_nombre] && (
                           <a
                             href={FONDO_URLS[fondo.tipo_nombre]}
-                            target="_blank" // Abrir en nueva pestaña
-                            rel="noopener noreferrer" // Seguridad
+                            target="_blank"
+                            rel="noopener noreferrer"
                             className="text-blue-600 font-semibold mt-2 hover:underline text-xs line-clamp-1"
-                            onClick={(e) => e.stopPropagation()} // Evita que el clic en el enlace expanda el acordeón
+                            onClick={(e) => e.stopPropagation()}
                           >
                             {FONDO_URLS[fondo.tipo_nombre]}
                           </a>
@@ -586,7 +482,11 @@ export default function FondosPage() {
                       </div>
                       <div className="text-center">
                         <span
-                          className={`px-3 py-1 rounded-full text-xs font-bold ${getTRLColor(fondo.trl === null ? "Sin información" : String(fondo.trl))}`}
+                          className={`px-3 py-1 rounded-full text-xs font-bold ${getTRLColor(
+                            fondo.trl === null
+                              ? "Sin información"
+                              : String(fondo.trl)
+                          )}`}
                         >
                           {fondo.trl === null
                             ? "Sin información"
@@ -597,36 +497,23 @@ export default function FondosPage() {
                         {fondo.financiamiento || "Sin información"}
                       </div>
                       <div className="text-center text-gray-700 line-clamp-1">
-                        {fondo.plazo || "Sin información"}
+                        {fondo.duracion || "Sin información"}
                       </div>
                       <div className="text-center">
                         <span
-                          className={`px-3 py-1 rounded-full text-xs font-bold ${getEstadoBadgeColor(fondo.estado_vigencia === "Vigente")}`}
+                          className={`px-3 py-1 rounded-full text-xs font-bold ${getEstadoBadgeColor(
+                            fondo.estado_vigencia
+                          )}`}
                         >
                           {fondo.estado_vigencia}
                         </span>
                       </div>
-                      <div className="flex justify-center items-center">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-red-500 hover:bg-red-50/20 hover:text-red-700"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setFondoAEliminar(fondo);
-                            setIsDeleteDialogOpen(true);
-                          }}
-                        >
-                          <Trash2 className="h-5 w-5" />
-                        </Button>
-                      </div>
+                      <div className="flex justify-center items-center"></div>
                     </div>
-                    {/* Contenido expandido alineado */}
                     <AccordionContent asChild>
                       <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr_1fr_1fr_auto]">
                         <div className="col-span-7 bg-gray-50 p-6 border-t border-gray-200">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {/* Objetivo */}
                             <div>
                               <h4 className="font-semibold text-gray-800 mb-2 flex items-center">
                                 <Target className="w-4 h-4 mr-2 text-gray-600" />
@@ -637,7 +524,6 @@ export default function FondosPage() {
                                   "No se ha especificado el objetivo para este fondo."}
                               </p>
                             </div>
-                            {/* Requisitos */}
                             <div>
                               <h4 className="font-semibold text-gray-800 mb-2 flex items-center">
                                 <ClipboardList className="w-4 h-4 mr-2 text-gray-600" />
@@ -659,7 +545,6 @@ export default function FondosPage() {
                                 </p>
                               )}
                             </div>
-                            {/* Fechas Importantes */}
                             <div className="md:col-span-2">
                               <h4 className="font-semibold text-gray-800 mb-2 flex items-center">
                                 <Calendar className="w-4 h-4 mr-2 text-gray-600" />
@@ -683,186 +568,6 @@ export default function FondosPage() {
           </>
         )}
       </div>
-
-      {/* Modal para Crear Fondo */}
-      <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-        <DialogContent className="w-full max-w-[95vw] md:max-w-[900px] h-[95vh] overflow-y-auto rounded-lg p-4">
-          <DialogHeader>
-            <DialogTitle>Crear Nuevo Fondo Concursable</DialogTitle>
-            <DialogDescription>
-              Introduce los detalles del nuevo fondo concursable.
-              <span className="text-red-500 font-bold"> *</span> Campos
-              obligatorios.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            {/* Nombre del Fondo */}
-            <div className="grid grid-cols-4 items-center gap-4">
-              <label htmlFor="newFondoName" className="text-right">
-                Nombre del Fondo <span className="text-red-500">*</span>
-              </label>
-              <Input
-                id="newFondoName"
-                value={newFondoName}
-                onChange={(e) => setNewFondoName(e.target.value)}
-                className="col-span-3"
-              />
-            </div>
-
-            {/* Tipo de Fondo (Select) */}
-            <div className="grid grid-cols-4 items-center gap-4">
-              <label htmlFor="newFondoTipo" className="text-right">
-                Tipo de Convocatoria <span className="text-red-500">*</span>
-              </label>
-              <Select value={newFondoTipo} onValueChange={setNewFondoTipo}>
-                <SelectTrigger id="newFondoTipo" className="col-span-3">
-                  <SelectValue placeholder="Selecciona un tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  {tiposConvocatoriaList.map((tipo) => (
-                    <SelectItem key={tipo.id} value={String(tipo.id)}>
-                      {tipo.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Fechas de Inicio y Cierre */}
-            <div className="grid grid-cols-4 items-center gap-4">
-              <label htmlFor="newFondoInicio" className="text-right">
-                Fecha de Inicio
-              </label>
-              <Input
-                id="newFondoInicio"
-                type="date"
-                value={newFondoInicio}
-                onChange={(e) => setNewFondoInicio(e.target.value)}
-                className="col-span-3"
-              />
-              <label htmlFor="newFondoCierre" className="text-right">
-                Fecha de Cierre
-              </label>
-              <Input
-                id="newFondoCierre"
-                type="date"
-                value={newFondoCierre}
-                onChange={(e) => setNewFondoCierre(e.target.value)}
-                className="col-span-3"
-              />
-            </div>
-
-            {/* Financiamiento y Plazo */}
-            <div className="grid grid-cols-4 items-center gap-4">
-              <label htmlFor="newFondoFinanciamiento" className="text-right">
-                Financiamiento
-              </label>
-              <Input
-                id="newFondoFinanciamiento"
-                value={newFondoFinanciamiento}
-                onChange={(e) => setNewFondoFinanciamiento(e.target.value)}
-                className="col-span-3"
-              />
-              <label htmlFor="newFondoPlazo" className="text-right">
-                Plazo
-              </label>
-              <Input
-                id="newFondoPlazo"
-                value={newFondoPlazo}
-                onChange={(e) => setNewFondoPlazo(e.target.value)}
-                className="col-span-3"
-              />
-            </div>
-
-            {/* Objetivo */}
-            <div className="grid grid-cols-4 items-center gap-4">
-              <label htmlFor="newFondoObjetivo" className="text-right">
-                Objetivo
-              </label>
-              <Textarea
-                id="newFondoObjetivo"
-                value={newFondoObjetivo}
-                onChange={(e) => setNewFondoObjetivo(e.target.value)}
-                className="col-span-3 min-h-[80px]"
-              />
-            </div>
-
-            {/* TRL y Requisitos */}
-            <div className="grid grid-cols-4 items-center gap-4">
-              <label htmlFor="newFondoTrl" className="text-right">
-                TRL
-              </label>
-              <Select value={newFondoTrl} onValueChange={setNewFondoTrl}>
-                <SelectTrigger id="newFondoTrl" className="col-span-3">
-                  <SelectValue placeholder="Selecciona TRL" />
-                </SelectTrigger>
-                <SelectContent>
-                  {uniqueTRLs.map((trl) => (
-                    <SelectItem key={trl} value={trl}>
-                      {trl}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <label htmlFor="newFondoReq" className="text-right">
-                Requisitos (separados por línea)
-              </label>
-              <Textarea
-                id="newFondoReq"
-                value={newFondoReq}
-                onChange={(e) => setNewFondoReq(e.target.value)}
-                className="col-span-3 min-h-[40px]"
-              />
-            </div>
-
-            {errorLocal && (
-              <Alert variant="destructive" className="bg-red-50 text-red-700">
-                <XCircle className="h-5 w-5 mr-4" />
-                <AlertTitle>Error de formulario</AlertTitle>
-                <AlertDescription>{errorLocal}</AlertDescription>
-              </Alert>
-            )}
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsCreateModalOpen(false)}
-            >
-              Cancelar
-            </Button>
-            <Button type="submit" onClick={handleCreateFondo}>
-              Crear Fondo
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* AlertDialog para confirmación de eliminación */}
-      <AlertDialog
-        open={isDeleteDialogOpen}
-        onOpenChange={setIsDeleteDialogOpen}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Estás absolutamente seguro?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción no se puede deshacer. Esto eliminará permanentemente
-              el fondo{" "}
-              <strong>“{fondoAEliminar?.nombre || "seleccionado"}”</strong> de
-              nuestros servidores.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteFondoConfirm}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Eliminar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

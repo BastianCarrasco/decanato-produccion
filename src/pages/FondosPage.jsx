@@ -194,9 +194,13 @@ export default function FondosPage() {
         );
       }
       const data = await response.json();
-      const fondosResponse = data.data || [];
 
-      const processedFondos = fondosResponse.map((fondo) => {
+      // Filtrar aquí para solo incluir fondos donde "VALIDAR" sea TRUE
+      const filteredRawFondos = (data.data || []).filter(
+        (fondo) => fondo.VALIDAR === true
+      );
+
+      const processedFondos = filteredRawFondos.map((fondo) => {
         const tipoNombre = fondo["Tipo de Fondo"] || "Desconocido";
         const idFondo = fondo._id?.$oid || fondo._id;
 

@@ -37,14 +37,14 @@ import { useError } from "@/contexts/ErrorContext";
 import anidLogo from "../assets/tipos_convocatorias/anid_rojo_azul.png";
 import corfoLogo from "../assets/tipos_convocatorias/corfo2024.png";
 import goreLogo from "../assets/tipos_convocatorias/gore-valpo.jpg";
-import INTERNASPucvLogo from "../assets/tipos_convocatorias/INTERNASpucv.svg";
+import internasPucvLogo from "../assets/tipos_convocatorias/internaspucv.svg";
 import privadaLogo from "../assets/tipos_convocatorias/private.png";
 
 const FONDO_LOGOS = {
   ANID: anidLogo,
   CORFO: corfoLogo,
   GORE: goreLogo,
-  INTERNAS: INTERNASPucvLogo,
+  Internas: internasPucvLogo,
   PRIVADA: privadaLogo,
 };
 
@@ -52,7 +52,7 @@ const FONDO_URLS = {
   ANID: "https://anid.cl/",
   CORFO: "https://www.corfo.cl",
   GORE: "https://www.gobiernovalparaiso.cl/",
-  INTERNAS: "https://www.pucv.cl/",
+  Internas: "https://www.pucv.cl/",
   PRIVADA: "",
 };
 
@@ -76,7 +76,7 @@ export default function FondosPage() {
         return "bg-red-500 text-white";
       case "CORFO":
         return "bg-orange-500 text-white";
-      case "INTERNAS":
+      case "Internas":
         return "bg-blue-500 text-white";
       case "GORE":
         return "bg-purple-500 text-white";
@@ -262,7 +262,7 @@ export default function FondosPage() {
 
   const uniqueTiposFondo = useMemo(() => {
     const tiposDesdeData = fondosData.map((f) => f.tipo_nombre);
-    const tiposFijos = ["ANID", "CORFO", "GORE", "INTERNAS", "PRIVADA"];
+    const tiposFijos = ["ANID", "CORFO", "GORE", "Internas", "PRIVADA"];
     return [...new Set([...tiposDesdeData, ...tiposFijos])]
       .filter(Boolean)
       .sort();

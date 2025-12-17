@@ -949,17 +949,20 @@ export default function EstadisticasPage() {
   };
 
   return (
-    <div className="h-full bg-gradient-to-br from-slate-50 to-blue-50 px-4 sm:px-6 lg:px-8 py-8">
+    <div className="h-full bg-gradient-to-br from-blue-200 via-sky-300 to-blue-200 px-4 sm:px-6 lg:px-8 py-8">
       {loading ? (
-        <div className="flex flex-col items-center justify-center h-[calc(100vh-120px)]">
+        <div className="flex flex-col items-center justify-center h-[calc(100vh-120px)] bg-white/30 backdrop-blur-xl rounded-2xl p-10 shadow-xl border border-white/60">
           <Spinner size={64} className="text-[#2E5C8A] mb-4" />
-          <p className="text-lg text-gray-600">
+          <p className="text-lg text-gray-700">
             Cargando datos del dashboard... Por favor, espere.
           </p>
         </div>
       ) : errorLocal ? (
         <div className="max-w-7xl mx-auto py-8">
-          <Alert variant="destructive" className="bg-red-50 text-red-700">
+          <Alert
+            variant="destructive"
+            className="bg-white/30 backdrop-blur-xl rounded-2xl shadow-xl border border-white/60 hover:bg-white/40 hover:shadow-2xl transition-all duration-300"
+          >
             <XCircle className="h-5 w-5 mr-4" />
             <AlertTitle>Error al cargar las estadísticas</AlertTitle>
             <AlertDescription>{errorLocal}</AlertDescription>
@@ -967,17 +970,18 @@ export default function EstadisticasPage() {
         </div>
       ) : (
         <div className="max-w-7xl mx-auto space-y-4">
-          <div className="mb-2">
+          {/* Título */}
+          <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 shadow-xl border border-white/60 hover:bg-white/40 hover:shadow-2xl transition-all duration-300">
             <h2 className="text-3xl font-bold text-gray-900">Estadísticas</h2>
-            <p className="text-gray-600">
+            <p className="text-gray-700">
               Datos para la toma de decisiones estratégicas
             </p>
           </div>
 
+          {/* Botón exportar */}
           <div className="flex justify-end">
             <Button
-              variant="secondary"
-              className="bg-red-500 text-md text-white hover:bg-red-600 cursor-pointer"
+              className="bg-[#2E5C8A] text-white rounded-2xl px-4 py-2 shadow-xl border border-white/40 hover:bg-[#3B76B3] hover:shadow-2xl transition-all duration-300"
               onClick={generarPDF}
               disabled={loadingExportPDF}
             >
@@ -990,190 +994,174 @@ export default function EstadisticasPage() {
             </Button>
           </div>
 
-          {/* Filtros */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Filtrar por Escuela
-              </label>
-              <Select
-                onValueChange={setSelectedEscuela}
-                value={selectedEscuela}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Seleccionar Escuela" />
-                </SelectTrigger>
-                <SelectContent>
-                  {opcionesEscuela.map((opcion) => (
-                    <SelectItem key={opcion} value={opcion}>
-                      {opcion}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          {/* Filtros (glass) */}
+          <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 shadow-xl border border-white/60 hover:bg-white/40 hover:shadow-2xl transition-all duration-300">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-800 mb-1">
+                  Filtrar por Escuela
+                </label>
+                <Select
+                  onValueChange={setSelectedEscuela}
+                  value={selectedEscuela}
+                >
+                  <SelectTrigger className="w-full bg-white/50 backdrop-blur-md border border-white/60 hover:bg-white/70 transition-all">
+                    <SelectValue placeholder="Seleccionar Escuela" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {opcionesEscuela.map((opcion) => (
+                      <SelectItem key={opcion} value={opcion}>
+                        {opcion}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Filtrar por Temática
-              </label>
-              <Select
-                onValueChange={setSelectedTematica}
-                value={selectedTematica}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Seleccionar Temática" />
-                </SelectTrigger>
-                <SelectContent>
-                  {opcionesTematica.map((opcion) => (
-                    <SelectItem key={opcion} value={opcion}>
-                      {opcion}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-800 mb-1">
+                  Filtrar por Temática
+                </label>
+                <Select
+                  onValueChange={setSelectedTematica}
+                  value={selectedTematica}
+                >
+                  <SelectTrigger className="w-full bg-white/50 backdrop-blur-md border border-white/60 hover:bg-white/70 transition-all">
+                    <SelectValue placeholder="Seleccionar Temática" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {opcionesTematica.map((opcion) => (
+                      <SelectItem key={opcion} value={opcion}>
+                        {opcion}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Filtrar por Tipo de Fondo
-              </label>
-              <Select
-                onValueChange={setSelectedInstitucion}
-                value={selectedInstitucion}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Seleccionar Institución" />
-                </SelectTrigger>
-                <SelectContent>
-                  {opcionesInstitucion.map((opcion) => (
-                    <SelectItem key={opcion} value={opcion}>
-                      {opcion}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-800 mb-1">
+                  Filtrar por Tipo de Fondo
+                </label>
+                <Select
+                  onValueChange={setSelectedInstitucion}
+                  value={selectedInstitucion}
+                >
+                  <SelectTrigger className="w-full bg-white/50 backdrop-blur-md border border-white/60 hover:bg-white/70 transition-all">
+                    <SelectValue placeholder="Seleccionar Institución" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {opcionesInstitucion.map((opcion) => (
+                      <SelectItem key={opcion} value={opcion}>
+                        {opcion}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Filtrar por Estatus
-              </label>
-              <Select
-                onValueChange={setSelectedEstatus}
-                value={selectedEstatus}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Todos los Estatus" />
-                </SelectTrigger>
-                <SelectContent>
-                  {opcionesEstatus.map((opcion) => (
-                    <SelectItem key={opcion} value={opcion}>
-                      {opcion}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-800 mb-1">
+                  Filtrar por Estatus
+                </label>
+                <Select
+                  onValueChange={setSelectedEstatus}
+                  value={selectedEstatus}
+                >
+                  <SelectTrigger className="w-full bg-white/50 backdrop-blur-md border border-white/60 hover:bg-white/70 transition-all">
+                    <SelectValue placeholder="Todos los Estatus" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {opcionesEstatus.map((opcion) => (
+                      <SelectItem key={opcion} value={opcion}>
+                        {opcion}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div className="md:col-span-1 flex items-end">
-              <Button
-                onClick={resetFilters}
-                className="w-full cursor-pointer px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-              >
-                Limpiar Filtros
-              </Button>
+              <div className="md:col-span-1 flex items-end">
+                <Button
+                  onClick={resetFilters}
+                  className="w-full bg-gray-700 text-white rounded-2xl px-4 py-2 shadow-xl border border-white/40 hover:bg-gray-800 hover:shadow-2xl transition-all duration-300"
+                >
+                  Limpiar Filtros
+                </Button>
+              </div>
             </div>
           </div>
 
+          {/* Contenido exportable PDF */}
           <div
             className="grid grid-cols-1 lg:grid-cols-[1.2fr_2fr_2fr] gap-8 mb-8"
             ref={estadisticasContentRef}
           >
             {/* Columna 1 */}
             <div className="space-y-8">
+              {/* Indicadores */}
               <div className="grid grid-cols-1 gap-4">
-                <div className=" bg-[#e1edfd] rounded-lg p-4 shadow-sm border border-gray-100 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">
-                      Proyectos en Cartera
-                    </p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {indicadoresPrincipales.proyectosEnCartera}
-                    </p>
-                  </div>
-                  <FileText className="w-6 h-6 text-gray-700 opacity-70" />
-                </div>
-
-                <div className="bg-[#e1edfd]  rounded-lg p-4 shadow-sm border border-gray-100 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">
-                      MM$ Formulados
-                    </p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {indicadoresPrincipales.montoFormulado}
-                    </p>
-                  </div>
-                  <DollarSign className="w-6 h-6 text-gray-700 opacity-70" />
-                </div>
-
-                <div className="bg-[#e1edfd]  rounded-lg p-4 shadow-sm border border-gray-100 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">
-                      Escuelas FIN
-                    </p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {indicadoresPrincipales.escuelasFIN}
-                    </p>
-                  </div>
-                  <GraduationCap className="w-6 h-6 text-gray-700 opacity-70" />
-                </div>
-
-                <div className="bg-[#e1edfd]  rounded-lg p-4 shadow-sm border border-gray-100 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">
-                      Académicos Involucrados
-                    </p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {indicadoresPrincipales.academicosInvolucrados}
-                    </p>
-                  </div>
-                  <Users className="w-6 h-6 text-gray-700 opacity-70" />
-                </div>
-
-                <div className="bg-[#e1edfd] rounded-lg p-4 shadow-sm border border-gray-100 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">
-                      Empresas Partners
-                    </p>
-                    <p className="text-2xl font-bold text-gray-900">12</p>
-                  </div>
-                  <Building2 className="w-6 h-6 text-gray-700 opacity-70" />
-                </div>
-
-                <div className="bg-[#e1edfd]  rounded-lg p-4 shadow-sm border border-gray-100 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">
-                      Universidades Partners
-                    </p>
-                    <p className="text-2xl font-bold text-gray-900">5</p>
-                  </div>
-                  <University className="w-6 h-6 text-gray-700 opacity-70" />
-                </div>
+                {[
+                  {
+                    title: "Proyectos en Cartera",
+                    value: indicadoresPrincipales.proyectosEnCartera,
+                    icon: FileText,
+                  },
+                  {
+                    title: "MM$ Formulados",
+                    value: indicadoresPrincipales.montoFormulado,
+                    icon: DollarSign,
+                  },
+                  {
+                    title: "Escuelas FIN",
+                    value: indicadoresPrincipales.escuelasFIN,
+                    icon: GraduationCap,
+                  },
+                  {
+                    title: "Académicos Involucrados",
+                    value: indicadoresPrincipales.academicosInvolucrados,
+                    icon: Users,
+                  },
+                  { title: "Empresas Partners", value: 12, icon: Building2 },
+                  {
+                    title: "Universidades Partners",
+                    value: 5,
+                    icon: University,
+                  },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <div
+                      key={item.title}
+                      className="bg-white/30 backdrop-blur-xl rounded-2xl p-4 shadow-xl border border-white/60 hover:bg-white/40 hover:shadow-2xl transition-all duration-300 flex items-center justify-between"
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">
+                          {item.title}
+                        </p>
+                        <p className="text-2xl font-bold text-gray-900">
+                          {item.value}
+                        </p>
+                      </div>
+                      <Icon className="w-6 h-6 text-gray-700 opacity-70" />
+                    </div>
+                  );
+                })}
               </div>
 
-              <div className="bg-[#e1edfd] items-center rounded-xl p-6 text-gray-900 shadow-lg border border-gray-100">
-                <h3 className="text-lg text-center font-semibold">
+              {/* Temáticas Destacadas */}
+              <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 shadow-xl border border-white/60 hover:bg-white/40 hover:shadow-2xl transition-all duration-300">
+                <h3 className="text-lg text-center font-semibold text-gray-900">
                   Temáticas Destacadas
                 </h3>
-                <h3 className="text-sm text-gray-500 text-center font-semibold mb-4">
+                <h3 className="text-sm text-gray-700 text-center font-semibold mb-4">
                   Top 6 (por Proyecto)
                 </h3>
                 <div className="flex flex-col gap-2">
                   {tematicasDestacadas.map((tematica, index) => (
                     <span
                       key={index}
-                      className="bg-slate-50 text-blue-800 px-3 py-1 rounded-full text-center text-sm font-medium"
+                      className="bg-white/50 backdrop-blur-md text-blue-800 px-3 py-1 rounded-full text-center text-sm font-medium border border-white/60"
                     >
                       {tematica}
                     </span>
@@ -1181,19 +1169,22 @@ export default function EstadisticasPage() {
                 </div>
               </div>
 
-              <div className="bg-[#e1edfd] rounded-xl p-6 text-gray-900 shadow-lg border border-gray-100">
-                <h3 className="text-lg text-center font-semibold">
+              {/* Instrumentos Postulados */}
+              <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 shadow-xl border border-white/60 hover:bg-white/40 hover:shadow-2xl transition-all duration-300">
+                <h3 className="text-lg text-center font-semibold text-gray-900">
                   Instrumentos Postulados
                 </h3>
-                <h3 className="text-sm text-gray-500 text-center font-semibold mb-4">
+                <h3 className="text-sm text-gray-700 text-center font-semibold mb-4">
                   Top 5 (por Monto)
                 </h3>
                 <div className="flex flex-col">
                   {instrumentosPostulados.map((instrumento, index) => (
                     <div key={index} className="flex items-center mb-2 gap-4">
                       {renderInstitucionLogo(instrumento.name || "")}
-                      <span>{instrumento.name || "Sin información"}</span>
-                      <span className="font-semibold">
+                      <span className="text-gray-900">
+                        {instrumento.name || "Sin información"}
+                      </span>
+                      <span className="font-semibold text-gray-900">
                         {instrumento.montoFormatted}
                       </span>
                     </div>
@@ -1204,15 +1195,16 @@ export default function EstadisticasPage() {
 
             {/* Columna 2 */}
             <div className="space-y-8">
-              <div className="bg-white rounded-lg shadow-lg p-6">
+              {/* Proyectos por Profesor */}
+              <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 shadow-xl border border-white/60 hover:bg-white/40 hover:shadow-2xl transition-all duration-300">
                 <h4 className="text-lg font-semibold text-gray-900">
                   Proyectos por Profesor
                 </h4>
-                <h4 className="text-sm text-gray-600">
+                <h4 className="text-sm text-gray-700">
                   <strong>Datos que muestra:</strong> Cantidad de proyectos en
                   los que ha participado cada profesor.
                 </h4>
-                <h4 className="text-sm text-gray-600 mb-4">
+                <h4 className="text-sm text-gray-700 mb-4">
                   <strong>Insight principal:</strong> Identificar a los
                   profesores más activos o con mayor participación en proyectos.
                 </h4>
@@ -1223,7 +1215,7 @@ export default function EstadisticasPage() {
                       options={optionsChartProyectosPorProfesor}
                     />
                   ) : (
-                    <p className="text-gray-500">
+                    <p className="text-gray-700">
                       No hay datos de proyectos por profesor para la selección
                       actual.
                     </p>
@@ -1231,15 +1223,16 @@ export default function EstadisticasPage() {
                 </div>
               </div>
 
-              <div className="bg-white rounded-lg shadow-lg p-6">
+              {/* Proyectos por Unidad */}
+              <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 shadow-xl border border-white/60 hover:bg-white/40 hover:shadow-2xl transition-all duration-300">
                 <h4 className="text-lg font-semibold text-gray-900">
                   Proyectos por Unidad Académica
                 </h4>
-                <h4 className="text-sm text-gray-600">
+                <h4 className="text-sm text-gray-700">
                   <strong>Datos que muestra:</strong> Número total de proyectos
                   por cada unidad académica.
                 </h4>
-                <h4 className="text-sm text-gray-600 mb-4">
+                <h4 className="text-sm text-gray-700 mb-4">
                   <strong>Insight principal:</strong> Identificar qué unidades
                   son más productivas en términos de proyectos.
                 </h4>
@@ -1250,7 +1243,7 @@ export default function EstadisticasPage() {
                       options={optionsChartProyectosPorUnidad}
                     />
                   ) : (
-                    <p className="text-gray-500">
+                    <p className="text-gray-700">
                       No hay datos de proyectos por unidad para la selección
                       actual.
                     </p>
@@ -1258,15 +1251,16 @@ export default function EstadisticasPage() {
                 </div>
               </div>
 
-              <div className="bg-white rounded-lg shadow-lg p-6">
+              {/* Profesores por Unidad */}
+              <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 shadow-xl border border-white/60 hover:bg-white/40 hover:shadow-2xl transition-all duration-300">
                 <h4 className="text-lg font-semibold text-gray-900">
                   Profesores por Unidad Académica
                 </h4>
-                <h4 className="text-sm text-gray-600">
+                <h4 className="text-sm text-gray-700">
                   <strong>Datos que muestra:</strong> Cantidad de profesores
                   agrupados por unidad académica.
                 </h4>
-                <h4 className="text-sm text-gray-600 mb-4">
+                <h4 className="text-sm text-gray-700 mb-4">
                   <strong>Insight principal:</strong> Mostrar la distribución de
                   los académicos en las diferentes unidades.
                 </h4>
@@ -1277,7 +1271,7 @@ export default function EstadisticasPage() {
                       options={optionsChartProfesoresPorUnidad}
                     />
                   ) : (
-                    <p className="text-gray-500">
+                    <p className="text-gray-700">
                       No hay datos de profesores para la selección actual.
                     </p>
                   )}
@@ -1286,16 +1280,17 @@ export default function EstadisticasPage() {
             </div>
 
             {/* Columna 3 */}
-            <div className="lg:col-span-1 space-y-8">
-              <div className="bg-white rounded-lg shadow-lg p-6">
+            <div className="space-y-8">
+              {/* Proyectos por Temática */}
+              <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 shadow-xl border border-white/60 hover:bg-white/40 hover:shadow-2xl transition-all duration-300">
                 <h4 className="text-lg font-semibold text-gray-900">
                   Proyectos por Temática
                 </h4>
-                <h4 className="text-sm text-gray-600">
+                <h4 className="text-sm text-gray-700">
                   <strong>Datos que muestra:</strong> Distribución de los
                   proyectos según su área temática principal.
                 </h4>
-                <h4 className="text-sm text-gray-600 mb-4">
+                <h4 className="text-sm text-gray-700 mb-4">
                   <strong>Insight principal:</strong> Identificar las temáticas
                   más prevalentes o con mayor inversión/actividad.
                 </h4>
@@ -1306,7 +1301,7 @@ export default function EstadisticasPage() {
                       options={optionsChartProyectosPorTematica}
                     />
                   ) : (
-                    <p className="text-gray-500">
+                    <p className="text-gray-700">
                       No hay datos de proyectos por temática para la selección
                       actual.
                     </p>
@@ -1314,15 +1309,16 @@ export default function EstadisticasPage() {
                 </div>
               </div>
 
-              <div className="bg-white rounded-lg shadow-lg p-6">
+              {/* Proyectos por Tipo de Fondo */}
+              <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 shadow-xl border border-white/60 hover:bg-white/40 hover:shadow-2xl transition-all duration-300">
                 <h4 className="text-lg font-semibold text-gray-900">
                   Proyectos por Tipo de Fondo
                 </h4>
-                <h4 className="text-sm text-gray-600">
+                <h4 className="text-sm text-gray-700">
                   <strong>Datos que muestra:</strong> Cantidad de proyectos
                   según la institución o instrumento de financiamiento.
                 </h4>
-                <h4 className="text-sm text-gray-600 mb-4">
+                <h4 className="text-sm text-gray-700 mb-4">
                   <strong>Insight principal:</strong> Entender qué instrumentos
                   son más utilizados.
                 </h4>
@@ -1333,7 +1329,7 @@ export default function EstadisticasPage() {
                       options={optionsChartProyectosPorInstitucion}
                     />
                   ) : (
-                    <p className="text-gray-500">
+                    <p className="text-gray-700">
                       No hay datos de proyectos por tipo de fondo para la
                       selección actual.
                     </p>

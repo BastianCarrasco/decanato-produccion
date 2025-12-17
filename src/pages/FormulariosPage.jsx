@@ -210,21 +210,23 @@ export default function FormulariosPage() {
 
   // OPCIÓN A: 1/3 izquierda, 2/3 derecha (recomendada)
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-200 via-sky-300 to-blue-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
+        {/* Header */}
+        <div className="mb-8 bg-white/30 backdrop-blur-xl rounded-2xl p-6 shadow-xl border border-white/60 hover:bg-white/40 hover:shadow-2xl transition-all duration-300">
           <h2 className="text-3xl font-bold text-gray-900">Formularios</h2>
-          <p className="text-gray-600 mt-2">
+          <p className="text-gray-700 mt-2">
             Revisa las respuestas de los formularios
           </p>
         </div>
 
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
+        {/* Filtros */}
+        <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 shadow-xl border border-white/60 hover:bg-white/40 hover:shadow-2xl transition-all duration-300 mb-8">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex items-center space-x-2">
-                <Filter className="h-5 w-5 text-gray-600" />
-                <span className="text-gray-700 font-medium">Filtrar por:</span>
+                <Filter className="h-5 w-5 text-gray-700" />
+                <span className="text-gray-800 font-medium">Filtrar por:</span>
               </div>
 
               <div className="relative">
@@ -232,7 +234,7 @@ export default function FormulariosPage() {
                   value={filtroAcademico}
                   onValueChange={setFiltroAcademico}
                 >
-                  <SelectTrigger className="px-2 w-50 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white min-w-48">
+                  <SelectTrigger className="px-2 w-50 py-2 rounded-2xl bg-white/50 backdrop-blur-md border border-white/60 hover:bg-white/70 transition-all min-w-48">
                     <SelectValue placeholder="Todos los académicos" />
                   </SelectTrigger>
                   <SelectContent>
@@ -248,7 +250,7 @@ export default function FormulariosPage() {
 
               <div className="relative">
                 <Select value={filtroEscuela} onValueChange={setFiltroEscuela}>
-                  <SelectTrigger className="px-2 w-72 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white min-w-48">
+                  <SelectTrigger className="px-2 w-72 py-2 rounded-2xl bg-white/50 backdrop-blur-md border border-white/60 hover:bg-white/70 transition-all min-w-48">
                     <SelectValue placeholder="Todas las escuelas" />
                   </SelectTrigger>
                   <SelectContent>
@@ -265,7 +267,7 @@ export default function FormulariosPage() {
               <div className="relative">
                 <Input
                   type="date"
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white min-w-48"
+                  className="px-4 py-2 rounded-2xl bg-white/50 backdrop-blur-md border border-white/60 hover:bg-white/70 transition-all min-w-48"
                   value={filtroFecha}
                   onChange={(e) => setFiltroFecha(e.target.value)}
                 />
@@ -274,7 +276,7 @@ export default function FormulariosPage() {
 
             <div className="flex items-center space-x-3">
               <Button
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="bg-[#2E5C8A] text-white rounded-2xl px-4 py-2 shadow-xl border border-white/40 hover:bg-[#3B76B3] hover:shadow-2xl transition-all duration-300"
                 onClick={() => {
                   setFiltroAcademico("todos");
                   setFiltroEscuela("todos");
@@ -287,51 +289,55 @@ export default function FormulariosPage() {
           </div>
         </div>
 
-        {/* CAMBIO: de 2 columnas iguales a 3 columnas con spans */}
+        {/* Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* IZQUIERDA: 1/3 */}
-          <div className="bg-white rounded-lg shadow-lg lg:col-span-1">
-            <div className="p-6 border-b border-gray-200 flex items-center space-x-3">
-              <List className="h-6 w-6 text-gray-600" />
+          {/* IZQUIERDA: Lista */}
+          <div className="bg-white/30 backdrop-blur-xl rounded-2xl shadow-xl border border-white/60 hover:bg-white/40 hover:shadow-2xl transition-all duration-300 lg:col-span-1 overflow-hidden">
+            <div className="p-6 border-b border-white/60 flex items-center space-x-3">
+              <List className="h-6 w-6 text-gray-700" />
               <h3 className="text-lg font-semibold text-gray-900">
                 Lista de respuestas
               </h3>
             </div>
 
-            <div className="divide-y divide-gray-200">
+            <div className="divide-y divide-white/50">
               {loading ? (
                 <div className="flex justify-center items-center h-48 py-8">
                   <Spinner size={32} className="text-[#2E5C8A]" />
                 </div>
               ) : errorLocal ? (
-                <Alert
-                  variant="destructive"
-                  className="bg-red-50 text-red-700 mx-4 my-4"
-                >
-                  <XCircle className="h-5 w-5 mr-4" />
-                  <AlertTitle>Error al cargar respuestas</AlertTitle>
-                  <AlertDescription>{errorLocal}</AlertDescription>
-                </Alert>
+                <div className="p-4">
+                  <Alert
+                    variant="destructive"
+                    className="bg-white/30 backdrop-blur-xl rounded-2xl shadow-xl border border-white/60"
+                  >
+                    <XCircle className="h-5 w-5 mr-4" />
+                    <AlertTitle>Error al cargar respuestas</AlertTitle>
+                    <AlertDescription>{errorLocal}</AlertDescription>
+                  </Alert>
+                </div>
               ) : respuestasFiltradas.length === 0 ? (
-                <Alert
-                  variant="default"
-                  className="bg-blue-50 text-blue-700 mx-4 my-4"
-                >
-                  <Info className="h-5 w-5 mr-4" />
-                  <AlertTitle>No hay respuestas</AlertTitle>
-                  <AlertDescription>
-                    No se encontraron respuestas con los filtros actuales.
-                  </AlertDescription>
-                </Alert>
+                <div className="p-4">
+                  <Alert
+                    variant="default"
+                    className="bg-white/30 backdrop-blur-xl rounded-2xl shadow-xl border border-white/60"
+                  >
+                    <Info className="h-5 w-5 mr-4" />
+                    <AlertTitle>No hay respuestas</AlertTitle>
+                    <AlertDescription>
+                      No se encontraron respuestas con los filtros actuales.
+                    </AlertDescription>
+                  </Alert>
+                </div>
               ) : (
                 respuestasFiltradas.map((respuesta) => (
                   <div
                     key={respuesta.id}
                     onClick={() => setRespuestaSeleccionadaId(respuesta.id)}
-                    className={`p-6 cursor-pointer transition-colors ${
+                    className={`p-6 cursor-pointer transition-all duration-300 ${
                       respuestaSeleccionadaId === respuesta.id
-                        ? "bg-blue-50 border-l-4 border-blue-500"
-                        : "hover:bg-gray-50 border-l-4 border-transparent"
+                        ? "bg-white/40 border-l-4 border-[#2E5C8A]"
+                        : "hover:bg-white/20 border-l-4 border-transparent"
                     }`}
                   >
                     <div className="flex items-start justify-between">
@@ -348,11 +354,11 @@ export default function FormulariosPage() {
                         </div>
 
                         <div className="space-y-1">
-                          <div className="flex items-center space-x-2 text-sm text-gray-600">
+                          <div className="flex items-center space-x-2 text-sm text-gray-700">
                             <School className="h-4 w-4" />
                             <span>Escuela: {respuesta.escuela}</span>
                           </div>
-                          <div className="flex items-center space-x-2 text-sm text-gray-600">
+                          <div className="flex items-center space-x-2 text-sm text-gray-700">
                             <Calendar className="h-4 w-4" />
                             <span>{formatDate(respuesta.fecha)}</span>
                           </div>
@@ -365,25 +371,26 @@ export default function FormulariosPage() {
             </div>
           </div>
 
-          {/* DERECHA: 2/3 */}
-          <div className="bg-white rounded-lg shadow-lg lg:col-span-2">
-            <div className="p-6 border-b border-gray-200">
+          {/* DERECHA: Detalle */}
+          <div className="bg-white/30 backdrop-blur-xl rounded-2xl shadow-xl border border-white/60 hover:bg-white/40 hover:shadow-2xl transition-all duration-300 lg:col-span-2 overflow-hidden">
+            <div className="p-6 border-b border-white/60">
               <div className="flex items-center space-x-3">
-                <User className="h-6 w-6 text-gray-600" />
+                <User className="h-6 w-6 text-gray-700" />
                 <h3 className="text-lg font-semibold text-gray-900">
                   Detalles de la Respuesta
                 </h3>
               </div>
             </div>
 
-            {respuestaSeleccionada && (
+            {respuestaSeleccionada ? (
               <div className="p-6">
-                <div className="bg-blue-50 rounded-lg p-4 mb-6">
+                {/* Resumen */}
+                <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-4 shadow-xl border border-white/60 mb-6">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <div className="flex items-center space-x-2 mb-1">
-                        <User className="h-4 w-4 text-blue-600" />
-                        <span className="text-sm font-medium text-blue-600">
+                        <User className="h-4 w-4 text-[#2E5C8A]" />
+                        <span className="text-sm font-medium text-[#2E5C8A]">
                           Investigador:
                         </span>
                       </div>
@@ -394,8 +401,8 @@ export default function FormulariosPage() {
 
                     <div>
                       <div className="flex items-center space-x-2 mb-1">
-                        <School className="h-4 w-4 text-blue-600" />
-                        <span className="text-sm font-medium text-blue-600">
+                        <School className="h-4 w-4 text-[#2E5C8A]" />
+                        <span className="text-sm font-medium text-[#2E5C8A]">
                           Escuela:
                         </span>
                       </div>
@@ -406,8 +413,8 @@ export default function FormulariosPage() {
 
                     <div>
                       <div className="flex items-center space-x-2 mb-1">
-                        <Calendar className="h-4 w-4 text-blue-600" />
-                        <span className="text-sm font-medium text-blue-600">
+                        <Calendar className="h-4 w-4 text-[#2E5C8A]" />
+                        <span className="text-sm font-medium text-[#2E5C8A]">
                           Fecha:
                         </span>
                       </div>
@@ -418,9 +425,10 @@ export default function FormulariosPage() {
                   </div>
                 </div>
 
+                {/* Respuestas */}
                 <div>
                   <div className="flex items-center space-x-2 mb-4">
-                    <FileText className="h-5 w-5 text-gray-600" />
+                    <FileText className="h-5 w-5 text-gray-700" />
                     <h4 className="text-lg font-semibold text-gray-900">
                       Respuestas del Cuestionario
                     </h4>
@@ -430,7 +438,7 @@ export default function FormulariosPage() {
                     {respuestaSeleccionada.respuestas.map((itemRespuesta) => (
                       <div
                         key={itemRespuesta.numero}
-                        className="border border-gray-200 rounded-lg p-4"
+                        className="bg-white/30 backdrop-blur-xl rounded-2xl p-4 shadow-xl border border-white/60 hover:bg-white/40 hover:shadow-2xl transition-all duration-300"
                       >
                         <div className="mb-3">
                           <h5 className="font-semibold text-gray-900 mb-2">
@@ -440,8 +448,8 @@ export default function FormulariosPage() {
                             {itemRespuesta.texto}
                           </p>
                         </div>
-                        <div className="bg-gray-50 rounded-lg p-3">
-                          <p className="text-gray-500 italic">
+                        <div className="bg-white/40 backdrop-blur-md rounded-2xl p-3 border border-white/60">
+                          <p className="text-gray-700 italic">
                             {itemRespuesta.respuesta || "Sin respuesta"}
                           </p>
                         </div>
@@ -449,6 +457,19 @@ export default function FormulariosPage() {
                     ))}
                   </div>
                 </div>
+              </div>
+            ) : (
+              <div className="p-6">
+                <Alert
+                  variant="default"
+                  className="bg-white/30 backdrop-blur-xl rounded-2xl shadow-xl border border-white/60"
+                >
+                  <Info className="h-5 w-5 mr-4" />
+                  <AlertTitle>Sin selección</AlertTitle>
+                  <AlertDescription>
+                    Selecciona una respuesta en la lista para ver su detalle.
+                  </AlertDescription>
+                </Alert>
               </div>
             )}
           </div>

@@ -1,38 +1,20 @@
+// src/pages/EstadisticasPage.jsx
 import { useState, useEffect, useCallback, useRef } from "react";
-// Lucide icons
 import {
-  BarChart3,
   Building2,
   DollarSign,
   FileText,
   GraduationCap,
   Users,
   University,
-  ChevronDown, // Importar ChevronDown para el icono de expandir/colapsar
-  ChevronUp, // Importar ChevronUp para el icono de expandir/colapsar
   ArrowDownToLine,
-  ArrowUpToLine,
+  XCircle,
 } from "lucide-react";
 
 // PDF export libraries
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { autoTable } from "jspdf-autotable";
-
-// Recharts imports - AHORA SERÁN REEMPLAZADOS POR Chart.js
-// import {
-//   PieChart as RechartsPieChart,
-//   Cell,
-//   BarChart,
-//   Bar,
-//   XAxis,
-//   YAxis,
-//   CartesianGrid,
-//   Tooltip,
-//   ResponsiveContainer,
-//   Pie,
-//   Text,
-// } from "recharts";
 
 // Chart.js imports
 import { Bar } from "react-chartjs-2";
@@ -46,7 +28,6 @@ import {
   Legend,
 } from "chart.js";
 
-// Register Chart.js components
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -71,27 +52,17 @@ import { Button } from "@/components/ui/button";
 import { useError } from "@/contexts/ErrorContext";
 import { Spinner } from "@/components/ui/spinner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { XCircle, Info } from "lucide-react";
-
-// API services
-import funcionesService from "../api/funciones.js";
-import estadisticasService from "../api/estadisticas.js";
-import academicosService from "../api/academicos.js";
-import unidadesAcademicasService from "../api/unidadesacademicas.js";
 
 export default function EstadisticasPage() {
-  const [proyectosData, setProyectosData] = useState([]); // getDataInterseccionProyectos
-  const [profesoresPorUnidadData, setProfesoresPorUnidadData] = useState([]); // estadisticasService.getAcademicosPorUnidad
-  const [proyectosPorProfesorData, setProyectosPorProfesorData] = useState([]); // estadisticasService.getProyectosPorProfesor
-  const [academicosData, setAcademicosData] = useState([]); // academicosService.getAllAcademicos
-  const [unidadesData, setUnidadesData] = useState([]); // unidadesAcademicasService.getAllUnidadesAcademicas
+  const VITE_URL_BACKEND = import.meta.env.VITE_URL_BACKEND;
 
-  const [academicosMap, setAcademicosMap] = useState({});
-  const [unidadesMap, setUnidadesMap] = useState({});
+  const [proyectosData, setProyectosData] = useState([]);
+  const [profesoresPorUnidadData, setProfesoresPorUnidadData] = useState([]);
+  const [proyectosPorProfesorData, setProyectosPorProfesorData] = useState([]);
 
   const [indicadoresPrincipales, setIndicadoresPrincipales] = useState({
     proyectosEnCartera: 0,
-    montoFormulado: 0, // En número, se formatea en la función formatMM
+    montoFormulado: "0 MM$",
     escuelasFIN: 0,
     academicosInvolucrados: 0,
   });
@@ -104,7 +75,7 @@ export default function EstadisticasPage() {
   const [errorLocal, setErrorLocal] = useState(null);
   const { setError: setErrorGlobal } = useError();
 
-  const estadisticasContentRef = useRef(null); // Ref para todo el contenido principal que queremos exportar
+  const estadisticasContentRef = useRef(null);
   const [loadingExportPDF, setLoadingExportPDF] = useState(false);
 
   // --- Estados para los filtros ---
@@ -115,33 +86,7 @@ export default function EstadisticasPage() {
   const [selectedInstitucion, setSelectedInstitucion] = useState(
     "Todas las Instituciones"
   );
-
   const [selectedEstatus, setSelectedEstatus] = useState("Todos los Estatus");
-
-  // Opciones para los selects de filtro (calculadas dinámicamente)
-  const opcionesEscuela = [
-    ...new Set(profesoresPorUnidadData.map((item) => item.UnidadAcademica)),
-  ]
-    .filter(Boolean)
-    .sort();
-  opcionesEscuela.unshift("Todas las Escuelas");
-
-  const opcionesTematica = [...new Set(proyectosData.map((p) => p.tematica))]
-    .filter(Boolean)
-    .sort();
-  opcionesTematica.unshift("Todas las Temáticas");
-  // Asumiendo que 'institucion' en proyectosData es la cadena de texto del nombre de la institución
-  const opcionesInstitucion = [
-    ...new Set(proyectosData.map((p) => p.institucion)),
-  ]
-    .filter(Boolean)
-    .sort();
-  opcionesInstitucion.unshift("Todas las Instituciones");
-
-  const opcionesEstatus = [...new Set(proyectosData.map((p) => p.estatus))]
-    .filter(Boolean)
-    .sort();
-  opcionesEstatus.unshift("Todos los Estatus");
 
   // --- Estados para los datos filtrados de los gráficos ---
   const [filteredProfesoresPorUnidad, setFilteredProfesoresPorUnidad] =
@@ -156,73 +101,219 @@ export default function EstadisticasPage() {
     []
   );
 
-  // Paleta de azules (mantener consistente para los gráficos de barras)
+  // Paleta de azules
   const bluePalette = [
-    "#2E5C8A", // Azul principal
-    "#5D95C8", // Azul medio
-    "#7CA3CB", // Azul claro
-    "#3B82F6", // Azul acento
-    "#1E3A5C", // Azul oscuro
-    "#0F2A4A", // Más oscuro
-    "#4A7A9F", // Intermedio
+    "#2E5C8A",
+    "#5D95C8",
+    "#7CA3CB",
+    "#3B82F6",
+    "#1E3A5C",
+    "#0F2A4A",
+    "#4A7A9F",
   ];
 
-  const groupAndCount = (data, key) => {
-    const counts = {};
-    data.forEach((item) => {
-      const keyValue = item[`${key}_nombre`] || item[key];
-      if (keyValue) {
-        counts[keyValue] = (counts[keyValue] || 0) + 1;
+  // ---------------------------
+  // Helpers: normalización
+  // ---------------------------
+  const toArray = (value) => {
+    if (!value) return [];
+    if (Array.isArray(value)) return value.filter(Boolean).map(String);
+
+    if (typeof value === "string") {
+      const s = value.trim();
+      if (!s) return [];
+      // si viene como "A, B; C | D"
+      if (/[;,|]/.test(s)) {
+        return s
+          .split(/[;,|]/g)
+          .map((x) => x.trim())
+          .filter(Boolean);
       }
-    });
-    return Object.entries(counts).map(([name, value]) => ({ name, value }));
+      return [s];
+    }
+
+    return [String(value)];
   };
 
-  // Helper para formatear montos a MM$
-  const formatMM = useCallback((monto) => {
-    if (monto === null || monto === undefined || isNaN(monto)) return "0 MM$";
-    const numericMonto = parseFloat(monto);
-    if (isNaN(numericMonto)) return "0 MM$";
-    return `${(numericMonto / 1000000).toLocaleString("es-CL", {
+  // IMPORTANTE:
+  // El campo "Monto Proyecto MM$" en tu ejemplo parece venir como número MM$,
+  // no pesos. Ej: 8.737 = 8.737 MM$ (o 8737 MM$ según origen).
+  // Aquí lo tratamos como "MM$" tal cual (número).
+  const toNumberMM = (value) => {
+    if (value === null || value === undefined) return 0;
+    if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+
+    if (typeof value === "string") {
+      const s = value.trim();
+      if (!s) return 0;
+      // intenta convertir "8,737" -> 8.737
+      const normalized = s.replace(",", ".");
+      const n = Number(normalized);
+      return Number.isFinite(n) ? n : 0;
+    }
+    return 0;
+  };
+
+  const normalizeProyecto = (raw) => ({
+    id: raw["N°"] ?? raw.id ?? crypto.randomUUID(),
+    nombre: raw["Nombre Proyecto/Perfil Proyecto"] ?? "",
+    tematica: raw["Temática"] ?? null,
+    estatus: raw["Estatus"] ?? null,
+    unidad: raw["Unidad Académica"] ?? null,
+    unidadesPlus: toArray(raw["Unidad Académica ++"]),
+    institucion: raw["Institucion Convocatoria"] ?? null,
+    tipoConvocatoria: raw["Tipo Convocatoria"] ?? null,
+    montoMM: toNumberMM(raw["Monto Proyecto MM$"]),
+    lideres: toArray(raw["Académic@/s-Líder"]),
+    partners: toArray(raw["Académic@/s-Partner"]),
+    estudiantes: toArray(raw["Estudiantes"]),
+    validar:
+      String(raw["VALIDAR"] ?? "")
+        .trim()
+        .toUpperCase() === "TRUE",
+  });
+
+  // ---------------------------
+  // Helpers: agregaciones
+  // ---------------------------
+  const groupCountBy = (items, getKey) => {
+    const map = new Map();
+    for (const it of items) {
+      const key = getKey(it);
+      if (!key) continue;
+      map.set(key, (map.get(key) ?? 0) + 1);
+    }
+    return Array.from(map.entries()).map(([name, value]) => ({ name, value }));
+  };
+
+  const buildProyectosPorProfesor = (items) => {
+    const map = new Map();
+
+    for (const p of items) {
+      const personas = [...(p.lideres ?? []), ...(p.partners ?? [])];
+
+      // evita doble conteo dentro del mismo proyecto
+      const unique = Array.from(new Set(personas.map((x) => String(x).trim())));
+
+      for (const nombre of unique) {
+        if (!nombre) continue;
+        map.set(nombre, (map.get(nombre) ?? 0) + 1);
+      }
+    }
+
+    return Array.from(map.entries())
+      .map(([profesor, proyectos]) => ({ profesor, proyectos }))
+      .sort((a, b) => b.proyectos - a.proyectos);
+  };
+
+  const buildProfesoresPorUnidad = (items) => {
+    // profesores únicos por unidad, según líderes+partners
+    const map = new Map();
+
+    for (const p of items) {
+      const unidad = p.unidad;
+      if (!unidad) continue;
+
+      const personas = new Set(
+        [...(p.lideres ?? []), ...(p.partners ?? [])].map((x) =>
+          String(x).trim()
+        )
+      );
+
+      if (!map.has(unidad)) map.set(unidad, new Set());
+      const set = map.get(unidad);
+
+      for (const per of personas) {
+        if (per) set.add(per);
+      }
+    }
+
+    return Array.from(map.entries())
+      .map(([UnidadAcademica, set]) => ({
+        UnidadAcademica,
+        NumeroDeProfesores: set.size,
+      }))
+      .sort((a, b) => b.NumeroDeProfesores - a.NumeroDeProfesores);
+  };
+
+  // Helper para formatear MM$ (ya viene en MM$)
+  const formatMM = useCallback((montoMM) => {
+    if (montoMM === null || montoMM === undefined || isNaN(montoMM))
+      return "0 MM$";
+    const numericMonto = Number(montoMM);
+    if (!Number.isFinite(numericMonto)) return "0 MM$";
+
+    return `${numericMonto.toLocaleString("es-CL", {
       minimumFractionDigits: 0,
       maximumFractionDigits: 3,
     })} MM$`;
   }, []);
 
-  // Custom Tooltip (not used directly by Chart.js, Chart.js has its own built-in)
-  // const CustomTooltip = ({ active, payload, label }) => { ... };
+  // ---------------------------
+  // Opciones de selects (dinámicas)
+  // ---------------------------
+  const opcionesEscuela = [
+    ...new Set(profesoresPorUnidadData.map((item) => item.UnidadAcademica)),
+  ]
+    .filter(Boolean)
+    .sort();
+  opcionesEscuela.unshift("Todas las Escuelas");
 
+  const opcionesTematica = [...new Set(proyectosData.map((p) => p.tematica))]
+    .filter(Boolean)
+    .sort();
+  opcionesTematica.unshift("Todas las Temáticas");
+
+  const opcionesInstitucion = [
+    ...new Set(proyectosData.map((p) => p.institucion)),
+  ]
+    .filter(Boolean)
+    .sort();
+  opcionesInstitucion.unshift("Todas las Instituciones");
+
+  const opcionesEstatus = [...new Set(proyectosData.map((p) => p.estatus))]
+    .filter(Boolean)
+    .sort();
+  opcionesEstatus.unshift("Todos los Estatus");
+
+  // ---------------------------
+  // Fetch desde VITE_URL_BACKEND
+  // ---------------------------
   const fetchDashboardData = async () => {
     setLoading(true);
     setErrorLocal(null);
     setErrorGlobal(null);
+
     try {
-      const [
-        proyectosRes,
-        profesoresPorUnidadRes,
-        proyectosPorProfesorRes,
-        unidadesRes,
-      ] = await Promise.all([
-        funcionesService.getDataInterseccionProyectos(),
-        estadisticasService.getAcademicosPorUnidad(),
-        estadisticasService.getProyectosPorProfesor(),
-        unidadesAcademicasService.getAllUnidadesAcademicas(),
-      ]);
+      if (!VITE_URL_BACKEND) {
+        throw new Error("VITE_URL_BACKEND no está definido en el .env");
+      }
 
-      const newUnidadesMap = unidadesRes.reduce((map, unidad) => {
-        map[unidad.id_unidad] = unidad;
-        return map;
-      }, {});
-      setUnidadesMap(newUnidadesMap);
-      setUnidadesData(unidadesRes);
+      const res = await fetch(VITE_URL_BACKEND, { method: "GET" });
+      if (!res.ok) throw new Error(`Backend HTTP ${res.status}`);
 
-      setProyectosData(proyectosRes);
-      setProyectosPorProfesorData(proyectosPorProfesorRes);
-      setProfesoresPorUnidadData(profesoresPorUnidadRes);
+      const raw = await res.json();
+      const list = Array.isArray(raw) ? raw : raw?.data;
 
-      setAcademicosData([]);
+      if (!Array.isArray(list)) {
+        throw new Error("El backend no devolvió un arreglo ni { data: [] }");
+      }
+
+      const proyectos = list.map(normalizeProyecto).filter((p) => p.validar);
+
+      setProyectosData(proyectos);
+
+      // Construimos datasets base desde el mismo backend
+      const proyectosPorProfesor = buildProyectosPorProfesor(proyectos);
+      setProyectosPorProfesorData(proyectosPorProfesor);
+
+      const profesoresPorUnidad = buildProfesoresPorUnidad(proyectos);
+      setProfesoresPorUnidadData(profesoresPorUnidad);
     } catch (err) {
       console.error("Error fetching dashboard data:", err);
+      setErrorLocal(
+        err?.message || "Error al cargar los datos. Intente más tarde."
+      );
       setErrorGlobal({
         type: "error",
         title: "Error al cargar los datos del dashboard.",
@@ -243,27 +334,17 @@ export default function EstadisticasPage() {
     fetchDashboardData();
   }, []);
 
-  // --- Lógica de filtrado ---
+  // ---------------------------
+  // Lógica de filtrado + indicadores
+  // ---------------------------
   useEffect(() => {
+    // Filtrado base por selects
     let currentProyectos = proyectosData;
-    let currentProfesoresPorUnidad = profesoresPorUnidadData;
-    let currentProyectosPorProfesor = proyectosPorProfesorData;
 
-    // Filtro por escuela
     if (selectedEscuela !== "Todas las Escuelas") {
-      currentProyectos = proyectosData.filter(
+      currentProyectos = currentProyectos.filter(
         (p) => p.unidad === selectedEscuela
       );
-      currentProfesoresPorUnidad = profesoresPorUnidadData.filter(
-        (item) => item.UnidadAcademica === selectedEscuela
-      );
-      currentProyectosPorProfesor = proyectosPorProfesorData.filter(
-        (p) => p.UnidadAcademica === selectedEscuela
-      );
-    } else {
-      currentProyectos = proyectosData;
-      currentProfesoresPorUnidad = profesoresPorUnidadData;
-      currentProyectosPorProfesor = proyectosPorProfesorData;
     }
 
     if (selectedTematica !== "Todas las Temáticas") {
@@ -284,152 +365,133 @@ export default function EstadisticasPage() {
       );
     }
 
-    // Prepare data for Chart.js
-    // Proyectos por Temática
+    // Gráficos dependientes del filtro
     setFilteredProyectosPorTematica(
-      groupAndCount(currentProyectos, "tematica")
-    );
-    // Proyectos por Tipo de Fondo
-    setFilteredProyectosPorInstitucion(
-      groupAndCount(currentProyectos, "institucion")
+      groupCountBy(currentProyectos, (p) => p.tematica)
     );
 
-    // Profesores por Unidad Académica
-    const dataProfesoresPorUnidad = currentProfesoresPorUnidad
-      .filter((item) => item.NumeroDeProfesores > 0)
-      .map((item) => ({
-        unidad: item.UnidadAcademica,
-        profesores: item.NumeroDeProfesores,
+    setFilteredProyectosPorInstitucion(
+      groupCountBy(currentProyectos, (p) => p.institucion)
+    );
+
+    const proyectosPorUnidadAgrupado = groupCountBy(
+      currentProyectos,
+      (p) => p.unidad
+    );
+
+    setFilteredProyectosPorUnidad(
+      proyectosPorUnidadAgrupado
+        .map((item) => ({ unidad: item.name, proyectos: item.value }))
+        .sort((a, b) => b.proyectos - a.proyectos)
+    );
+
+    // Para "Proyectos por Profesor", lo reconstruimos desde currentProyectos
+    setFilteredProyectosPorProfesor(
+      buildProyectosPorProfesor(currentProyectos)
+    );
+
+    // Para "Profesores por Unidad", filtramos desde el dataset global,
+    // pero si quieres exactitud con filtros tematica/estatus/etc,
+    // reconstruimos desde currentProyectos:
+    const profesoresUnidadFromFiltered = buildProfesoresPorUnidad(
+      currentProyectos
+    )
+      .map((x) => ({
+        unidad: x.UnidadAcademica,
+        profesores: x.NumeroDeProfesores,
       }))
       .sort((a, b) => b.profesores - a.profesores);
-    setFilteredProfesoresPorUnidad(dataProfesoresPorUnidad);
 
-    // Proyectos por Profesor
-    const dataProyectosPorProfesor = currentProyectosPorProfesor
-      .filter((p) => p.NumeroDeProyectos > 0)
-      .map((p) => ({
-        profesor: `${p.NombreAcademico} ${p.ApellidoAcademico || ""}`.trim(),
-        proyectos: p.NumeroDeProyectos,
-      }))
-      .sort((a, b) => b.proyectos - a.proyectos);
-    setFilteredProyectosPorProfesor(dataProyectosPorProfesor);
+    setFilteredProfesoresPorUnidad(profesoresUnidadFromFiltered);
 
-    // Proyectos por Unidad
-    const proyectosPorUnidadAgrupado = groupAndCount(
-      currentProyectos,
-      "unidad"
-    );
-    const dataProyectosPorUnidad = proyectosPorUnidadAgrupado
-      .map((item) => ({
-        unidad: item.name,
-        proyectos: item.value,
-      }))
-      .filter((d) => d.proyectos > 0)
-      .sort((a, b) => b.proyectos - a.proyectos);
-    setFilteredProyectosPorUnidad(dataProyectosPorUnidad);
-
-    // Recalcular Indicadores Principales Compactos
+    // Indicadores (estos pueden ser globales o filtrados; aquí los dejo globales
+    // como lo tenías: projectsInDashboard = proyectosData)
     const projectsInDashboard = proyectosData;
 
-    const totalMonto = projectsInDashboard.reduce(
-      (sum, item) => sum + (item.monto || 0),
+    const totalMontoMM = projectsInDashboard.reduce(
+      (sum, item) => sum + (item.montoMM || 0),
       0
     );
-    const escuelasConProfesores = new Set(
-      projectsInDashboard.map((item) => item.unidad)
+
+    const escuelasConProyectos = new Set(
+      projectsInDashboard.map((item) => item.unidad).filter(Boolean)
     ).size;
+
     const academicosUnicosEnProyectos = new Set(
-      proyectosPorProfesorData.map(
-        (p) => `${p.NombreAcademico} ${p.ApellidoAcademico}`
-      )
+      projectsInDashboard.flatMap((p) => [
+        ...(p.lideres ?? []),
+        ...(p.partners ?? []),
+      ])
     ).size;
 
     setIndicadoresPrincipales({
       proyectosEnCartera: projectsInDashboard.length,
-      montoFormulado: formatMM(totalMonto),
-      escuelasFIN: escuelasConProfesores,
+      montoFormulado: formatMM(totalMontoMM),
+      escuelasFIN: escuelasConProyectos,
       academicosInvolucrados: academicosUnicosEnProyectos,
     });
 
-    const countsTematicas = groupAndCount(projectsInDashboard, "tematica")
+    const countsTematicas = groupCountBy(projectsInDashboard, (p) => p.tematica)
       .sort((a, b) => b.value - a.value)
       .map((item) => item.name)
       .slice(0, 6);
     setTematicasDestacadas(countsTematicas);
 
+    // Instrumentos Postulados (por monto)
     const groupedInstruments = projectsInDashboard.reduce((acc, item) => {
       const key = `${item.institucion || "Sin instrumento"}`;
-      if (!acc[key]) {
-        acc[key] = { name: key, monto: 0 };
-      }
-      acc[key].monto += item.monto || 0;
+      if (!acc[key]) acc[key] = { name: key, montoMM: 0 };
+      acc[key].montoMM += item.montoMM || 0;
       return acc;
     }, {});
 
     const processedInstrumentsForPdf = Object.values(groupedInstruments)
       .map((instrument) => ({
         ...instrument,
-        montoFormatted: formatMM(instrument.monto),
+        montoFormatted: formatMM(instrument.montoMM),
       }))
-      .sort((a, b) => b.monto - a.monto);
+      .sort((a, b) => b.montoMM - a.montoMM);
 
-    const processedInstruments = Object.values(groupedInstruments)
-      .map((instrument) => ({
-        ...instrument,
-        montoFormatted: formatMM(instrument.monto),
-      }))
-      .sort((a, b) => b.monto - a.monto)
-      .slice(0, 5);
+    const processedInstrumentsTop5 = processedInstrumentsForPdf.slice(0, 5);
 
     setAllInstrumentosForPdf(processedInstrumentsForPdf);
-    setInstrumentosPostulados(processedInstruments);
+    setInstrumentosPostulados(processedInstrumentsTop5);
   }, [
     selectedEscuela,
     selectedTematica,
     selectedInstitucion,
-    proyectosData,
-    profesoresPorUnidadData,
-    proyectosPorProfesorData,
-    unidadesData,
-    formatMM,
     selectedEstatus,
+    proyectosData,
+    formatMM,
   ]);
 
-  // --- Chart.js Data & Options configurations ---
-
-  // #region Chart: Proyectos por Profesor
+  // ---------------------------
+  // Chart.js Data & Options
+  // ---------------------------
   const dataChartProyectosPorProfesor = {
     labels: filteredProyectosPorProfesor.map((d) => d.profesor),
     datasets: [
       {
         label: "Proyectos",
         data: filteredProyectosPorProfesor.map((d) => d.proyectos),
-        backgroundColor: bluePalette[0], // Using the first blue
+        backgroundColor: bluePalette[0],
       },
     ],
   };
 
   const optionsChartProyectosPorProfesor = {
     responsive: true,
-    maintainAspectRatio: false, // Allows chart to fit parent div
-    indexAxis: "x", // Vertical bars
+    maintainAspectRatio: false,
+    indexAxis: "x",
     plugins: {
-      legend: {
-        display: false, // Hide legend if only one dataset
-      },
-      title: {
-        display: false, // Title already in HTML
-      },
+      legend: { display: false },
+      title: { display: false },
       tooltip: {
         callbacks: {
           label: function (context) {
             let label = context.dataset.label || "";
-            if (label) {
-              label += ": ";
-            }
-            if (context.parsed.y !== null) {
-              label += context.parsed.y;
-            }
+            if (label) label += ": ";
+            if (context.parsed.y !== null) label += context.parsed.y;
             return label;
           },
         },
@@ -437,50 +499,29 @@ export default function EstadisticasPage() {
     },
     scales: {
       x: {
-        title: {
-          display: false,
-        },
         ticks: {
-          // You can use a callback to conditionally hide labels
-          autoSkip: true, // Let Chart.js decide skipping
-          maxRotation: 45, // Rotate labels for better fit
+          autoSkip: true,
+          maxRotation: 45,
           minRotation: 45,
-          // Custom callback to skip labels if needed, more flexible than fixed interval
-          // callback: function(val, index) {
-          //   return index % 2 === 0 ? this.getLabelForValue(val) : '';
-          // },
-          font: {
-            size: 11, // Match Recharts font size
-          },
+          font: { size: 11 },
         },
-        grid: {
-          display: false, // Hide vertical grid lines
-        },
+        grid: { display: false },
       },
       y: {
-        title: {
-          display: false,
-        },
         beginAtZero: true,
-        ticks: {
-          precision: 0, // No decimals for count
-        },
-        grid: {
-          color: "rgba(0, 0, 0, 0.05)", // Light horizontal grid
-        },
+        ticks: { precision: 0 },
+        grid: { color: "rgba(0, 0, 0, 0.05)" },
       },
     },
   };
-  // #endregion
 
-  // #region Chart: Proyectos por Unidad Académica
   const dataChartProyectosPorUnidad = {
     labels: filteredProyectosPorUnidad.map((d) => d.unidad),
     datasets: [
       {
         label: "Proyectos",
         data: filteredProyectosPorUnidad.map((d) => d.proyectos),
-        backgroundColor: bluePalette[2], // Different shade of blue
+        backgroundColor: bluePalette[2],
       },
     ],
   };
@@ -490,22 +531,14 @@ export default function EstadisticasPage() {
     maintainAspectRatio: false,
     indexAxis: "x",
     plugins: {
-      legend: {
-        display: false,
-      },
-      title: {
-        display: false,
-      },
+      legend: { display: false },
+      title: { display: false },
       tooltip: {
         callbacks: {
           label: function (context) {
             let label = context.dataset.label || "";
-            if (label) {
-              label += ": ";
-            }
-            if (context.parsed.y !== null) {
-              label += context.parsed.y;
-            }
+            if (label) label += ": ";
+            if (context.parsed.y !== null) label += context.parsed.y;
             return label;
           },
         },
@@ -517,35 +550,25 @@ export default function EstadisticasPage() {
           autoSkip: true,
           maxRotation: 45,
           minRotation: 45,
-          font: {
-            size: 11,
-          },
+          font: { size: 11 },
         },
-        grid: {
-          display: false,
-        },
+        grid: { display: false },
       },
       y: {
         beginAtZero: true,
-        ticks: {
-          precision: 0,
-        },
-        grid: {
-          color: "rgba(0, 0, 0, 0.05)",
-        },
+        ticks: { precision: 0 },
+        grid: { color: "rgba(0, 0, 0, 0.05)" },
       },
     },
   };
-  // #endregion
 
-  // #region Chart: Profesores por Unidad Académica
   const dataChartProfesoresPorUnidad = {
     labels: filteredProfesoresPorUnidad.map((d) => d.unidad),
     datasets: [
       {
         label: "Profesores",
         data: filteredProfesoresPorUnidad.map((d) => d.profesores),
-        backgroundColor: bluePalette[0], // Primary blue
+        backgroundColor: bluePalette[0],
       },
     ],
   };
@@ -555,22 +578,14 @@ export default function EstadisticasPage() {
     maintainAspectRatio: false,
     indexAxis: "x",
     plugins: {
-      legend: {
-        display: false,
-      },
-      title: {
-        display: false,
-      },
+      legend: { display: false },
+      title: { display: false },
       tooltip: {
         callbacks: {
           label: function (context) {
             let label = context.dataset.label || "";
-            if (label) {
-              label += ": ";
-            }
-            if (context.parsed.y !== null) {
-              label += context.parsed.y;
-            }
+            if (label) label += ": ";
+            if (context.parsed.y !== null) label += context.parsed.y;
             return label;
           },
         },
@@ -582,35 +597,25 @@ export default function EstadisticasPage() {
           autoSkip: true,
           maxRotation: 45,
           minRotation: 45,
-          font: {
-            size: 11,
-          },
+          font: { size: 11 },
         },
-        grid: {
-          display: false,
-        },
+        grid: { display: false },
       },
       y: {
         beginAtZero: true,
-        ticks: {
-          precision: 0,
-        },
-        grid: {
-          color: "rgba(0, 0, 0, 0.05)",
-        },
+        ticks: { precision: 0 },
+        grid: { color: "rgba(0, 0, 0, 0.05)" },
       },
     },
   };
-  // #endregion
 
-  // #region Chart: Proyectos por Temática (Horizontal Bar Chart)
   const dataChartProyectosPorTematica = {
     labels: filteredProyectosPorTematica.map((d) => d.name),
     datasets: [
       {
         label: "Proyectos",
         data: filteredProyectosPorTematica.map((d) => d.value),
-        backgroundColor: bluePalette[3], // Accent blue
+        backgroundColor: bluePalette[3],
       },
     ],
   };
@@ -618,24 +623,16 @@ export default function EstadisticasPage() {
   const optionsChartProyectosPorTematica = {
     responsive: true,
     maintainAspectRatio: false,
-    indexAxis: "y", // Horizontal bars
+    indexAxis: "y",
     plugins: {
-      legend: {
-        display: false,
-      },
-      title: {
-        display: false,
-      },
+      legend: { display: false },
+      title: { display: false },
       tooltip: {
         callbacks: {
           label: function (context) {
             let label = context.dataset.label || "";
-            if (label) {
-              label += ": ";
-            }
-            if (context.parsed.x !== null) {
-              label += context.parsed.x; // For horizontal bar, value is on x-axis
-            }
+            if (label) label += ": ";
+            if (context.parsed.x !== null) label += context.parsed.x;
             return label;
           },
         },
@@ -644,29 +641,16 @@ export default function EstadisticasPage() {
     scales: {
       x: {
         beginAtZero: true,
-        ticks: {
-          precision: 0,
-        },
-        grid: {
-          color: "rgba(0, 0, 0, 0.05)",
-        },
+        ticks: { precision: 0 },
+        grid: { color: "rgba(0, 0, 0, 0.05)" },
       },
       y: {
-        ticks: {
-          autoSkip: true, // Let Chart.js decide skipping
-          font: {
-            size: 12,
-          },
-        },
-        grid: {
-          display: false,
-        },
+        ticks: { autoSkip: true, font: { size: 12 } },
+        grid: { display: false },
       },
     },
   };
-  // #endregion
 
-  // #region Chart: Proyectos por Tipo de Fondo (Horizontal Bar Chart)
   const dataChartProyectosPorInstitucion = {
     labels: filteredProyectosPorInstitucion.map((d) => d.name),
     datasets: [
@@ -681,24 +665,16 @@ export default function EstadisticasPage() {
   const optionsChartProyectosPorInstitucion = {
     responsive: true,
     maintainAspectRatio: false,
-    indexAxis: "y", // Horizontal bars
+    indexAxis: "y",
     plugins: {
-      legend: {
-        display: false,
-      },
-      title: {
-        display: false,
-      },
+      legend: { display: false },
+      title: { display: false },
       tooltip: {
         callbacks: {
           label: function (context) {
             let label = context.dataset.label || "";
-            if (label) {
-              label += ": ";
-            }
-            if (context.parsed.x !== null) {
-              label += context.parsed.x;
-            }
+            if (label) label += ": ";
+            if (context.parsed.x !== null) label += context.parsed.x;
             return label;
           },
         },
@@ -707,42 +683,30 @@ export default function EstadisticasPage() {
     scales: {
       x: {
         beginAtZero: true,
-        ticks: {
-          precision: 0,
-        },
-        grid: {
-          color: "rgba(0, 0, 0, 0.05)",
-        },
+        ticks: { precision: 0 },
+        grid: { color: "rgba(0, 0, 0, 0.05)" },
       },
       y: {
-        ticks: {
-          autoSkip: true,
-          font: {
-            size: 12,
-          },
-        },
-        grid: {
-          display: false,
-        },
+        ticks: { autoSkip: true, font: { size: 12 } },
+        grid: { display: false },
       },
     },
   };
-  // #endregion
 
-  // Función para generar el PDF
+  // ---------------------------
+  // PDF
+  // ---------------------------
   const generarPDF = async () => {
     setLoadingExportPDF(true);
     try {
-      const doc = new jsPDF("p", "mm", "a4"); // Instancia de jsPDF
+      const doc = new jsPDF("p", "mm", "a4");
       const pdfWidth = doc.internal.pageSize.getWidth();
       const pdfHeight = doc.internal.pageSize.getHeight();
       const margin = 15;
       const contentWidth = pdfWidth - margin * 2;
 
-      // --- Página de los Gráficos (Imagen) ---
       const input = estadisticasContentRef.current;
       if (!input) {
-        console.error("No se encontró el elemento para exportar a PDF.");
         setLoadingExportPDF(false);
         return;
       }
@@ -750,10 +714,11 @@ export default function EstadisticasPage() {
       const canvas = await html2canvas(input, {
         scale: 2,
         useCORS: true,
-        logging: true,
+        logging: false,
         windowWidth: input.scrollWidth,
         windowHeight: input.scrollHeight,
       });
+
       const imgData = canvas.toDataURL("image/jpeg", 0.8);
 
       let imgRatio = canvas.width / canvas.height;
@@ -765,23 +730,27 @@ export default function EstadisticasPage() {
         imgDisplayWidth = imgDisplayHeight * imgRatio;
       }
 
-      let yPos = margin + 30; // Inicia después del título y la fecha
+      let yPos = margin + 30;
 
       doc.setFontSize(12);
       doc.text("Estadísticas del Dashboard", pdfWidth / 2, margin + 10, {
         align: "center",
       });
+
       doc.setFontSize(10);
       const today = new Date();
       const year = today.getFullYear();
       const month = String(today.getMonth() + 1).padStart(2, "0");
       const day = String(today.getDate()).padStart(2, "0");
       const dateString = `${day}-${month}-${year}`;
+
       doc.text(
         `Fecha de Exportación: ${dateString}`,
         pdfWidth / 2,
         margin + 20,
-        { align: "center" }
+        {
+          align: "center",
+        }
       );
 
       const startX = margin + (contentWidth - imgDisplayWidth) / 2;
@@ -794,38 +763,30 @@ export default function EstadisticasPage() {
         imgDisplayHeight
       );
 
-      // --- Sección de Datos Tabulares (Nuevas Páginas) ---
-      doc.addPage(); // Añadir una nueva página para las tablas
+      doc.addPage();
+      let currentY = margin + 10;
 
-      let currentY = margin + 10; // Posición Y para el contenido en la nueva página
-
-      // Función auxiliar para añadir títulos de sección y verificar si cabe la tabla
       const addSectionTitle = (titleText) => {
         if (currentY + 20 > pdfHeight - margin) {
-          // Margen de seguridad para el título
           doc.addPage();
           currentY = margin + 10;
         }
         doc.setFontSize(14);
-        doc.setTextColor(46, 92, 138); // Color azul similar al de la paleta
+        doc.setTextColor(46, 92, 138);
         doc.text(titleText, margin, currentY);
-        doc.setTextColor(0); // Resetear a negro
-        currentY += 10; // Espacio después del título
+        doc.setTextColor(0);
+        currentY += 10;
       };
 
-      // 1. Tabla de Proyectos por Profesor
       addSectionTitle("Datos: Proyectos por Profesor");
       if (filteredProyectosPorProfesor.length > 0) {
-        const headers = [["Profesor", "Proyectos"]];
-        const body = filteredProyectosPorProfesor.map((item) => [
-          item.profesor,
-          item.proyectos,
-        ]);
         autoTable(doc, {
-          // <-- CORRECTO: Llamada a autoTable directamente
           startY: currentY,
-          head: headers,
-          body: body,
+          head: [["Profesor", "Proyectos"]],
+          body: filteredProyectosPorProfesor.map((x) => [
+            x.profesor,
+            x.proyectos,
+          ]),
           margin: { left: margin, right: margin },
           styles: { fontSize: 8, cellPadding: 2, overflow: "linebreak" },
           headStyles: {
@@ -840,23 +801,15 @@ export default function EstadisticasPage() {
       } else {
         doc.setFontSize(10);
         doc.text("No hay datos de proyectos por profesor.", margin, currentY);
-        currentY += 10;
+        currentY += 20;
       }
-      currentY += 10;
 
-      // 2. Tabla de Proyectos por Unidad Académica
       addSectionTitle("Datos: Proyectos por Unidad Académica");
       if (filteredProyectosPorUnidad.length > 0) {
-        const headers = [["Unidad Académica", "Proyectos"]];
-        const body = filteredProyectosPorUnidad.map((item) => [
-          item.unidad,
-          item.proyectos,
-        ]);
         autoTable(doc, {
-          // <-- CORRECTO: Llamada a autoTable directamente
           startY: currentY,
-          head: headers,
-          body: body,
+          head: [["Unidad Académica", "Proyectos"]],
+          body: filteredProyectosPorUnidad.map((x) => [x.unidad, x.proyectos]),
           margin: { left: margin, right: margin },
           styles: { fontSize: 8, cellPadding: 2, overflow: "linebreak" },
           headStyles: {
@@ -875,23 +828,18 @@ export default function EstadisticasPage() {
           margin,
           currentY
         );
-        currentY += 10;
+        currentY += 20;
       }
-      currentY += 10;
 
-      // 3. Tabla de Profesores por Unidad Académica
       addSectionTitle("Datos: Profesores por Unidad Académica");
       if (filteredProfesoresPorUnidad.length > 0) {
-        const headers = [["Unidad Académica", "Profesores"]];
-        const body = filteredProfesoresPorUnidad.map((item) => [
-          item.unidad,
-          item.profesores,
-        ]);
         autoTable(doc, {
-          // <-- CORRECTO: Llamada a autoTable directamente
           startY: currentY,
-          head: headers,
-          body: body,
+          head: [["Unidad Académica", "Profesores"]],
+          body: filteredProfesoresPorUnidad.map((x) => [
+            x.unidad,
+            x.profesores,
+          ]),
           margin: { left: margin, right: margin },
           styles: { fontSize: 8, cellPadding: 2, overflow: "linebreak" },
           headStyles: {
@@ -910,23 +858,15 @@ export default function EstadisticasPage() {
           margin,
           currentY
         );
-        currentY += 10;
+        currentY += 20;
       }
-      currentY += 10;
 
-      // 4. Tabla de Proyectos por Temática
       addSectionTitle("Datos: Proyectos por Temática");
       if (filteredProyectosPorTematica.length > 0) {
-        const headers = [["Temática", "Proyectos"]];
-        const body = filteredProyectosPorTematica.map((item) => [
-          item.name,
-          item.value,
-        ]);
         autoTable(doc, {
-          // <-- CORRECTO: Llamada a autoTable directamente
           startY: currentY,
-          head: headers,
-          body: body,
+          head: [["Temática", "Proyectos"]],
+          body: filteredProyectosPorTematica.map((x) => [x.name, x.value]),
           margin: { left: margin, right: margin },
           styles: { fontSize: 8, cellPadding: 2, overflow: "linebreak" },
           headStyles: {
@@ -941,24 +881,15 @@ export default function EstadisticasPage() {
       } else {
         doc.setFontSize(10);
         doc.text("No hay datos de proyectos por temática.", margin, currentY);
-        currentY += 10;
+        currentY += 20;
       }
-      currentY += 10;
 
-      // 5. Tabla de Proyectos por Tipo de Fondo (Refleja el Bar Chart SIMPLE)
-      // Usaremos filteredProyectosPorInstitucion directamente
       addSectionTitle("Datos: Proyectos por Tipo de Fondo");
       if (filteredProyectosPorInstitucion.length > 0) {
-        const headers = [["Tipo de Fondo", "Proyectos"]];
-        const body = filteredProyectosPorInstitucion.map((item) => [
-          item.name,
-          item.value,
-        ]);
         autoTable(doc, {
-          // <-- CORRECTO: Llamada a autoTable directamente
           startY: currentY,
-          head: headers,
-          body: body,
+          head: [["Tipo de Fondo", "Proyectos"]],
+          body: filteredProyectosPorInstitucion.map((x) => [x.name, x.value]),
           margin: { left: margin, right: margin },
           styles: { fontSize: 8, cellPadding: 2, overflow: "linebreak" },
           headStyles: {
@@ -977,23 +908,15 @@ export default function EstadisticasPage() {
           margin,
           currentY
         );
-        currentY += 10;
+        currentY += 20;
       }
-      currentY += 10;
 
-      // 6. Tabla de Instrumentos Postulados (de la lista compacta)
       addSectionTitle("Datos: Instrumentos Postulados (Todos)");
       if (allInstrumentosForPdf.length > 0) {
-        const headers = [["Instrumento", "Monto Formulados"]];
-        const body = allInstrumentosForPdf.map((item) => [
-          item.name,
-          item.montoFormatted,
-        ]);
         autoTable(doc, {
-          // <-- CORRECTO: Llamada a autoTable directamente
           startY: currentY,
-          head: headers,
-          body: body,
+          head: [["Instrumento", "Monto (MM$)"]],
+          body: allInstrumentosForPdf.map((x) => [x.name, x.montoFormatted]),
           margin: { left: margin, right: margin },
           styles: { fontSize: 8, cellPadding: 2, overflow: "linebreak" },
           headStyles: {
@@ -1012,10 +935,10 @@ export default function EstadisticasPage() {
           margin,
           currentY
         );
-        currentY += 10;
+        currentY += 20;
       }
 
-      const filename = `estadisticas_dashboard_${day}-${month}-${year}.pdf`;
+      const filename = `estadisticas_dashboard_${dateString}.pdf`;
       doc.save(filename);
     } catch (error) {
       console.error("Error al generar el PDF:", error);
@@ -1029,8 +952,6 @@ export default function EstadisticasPage() {
     <div className="h-full bg-gradient-to-br from-slate-50 to-blue-50 px-4 sm:px-6 lg:px-8 py-8">
       {loading ? (
         <div className="flex flex-col items-center justify-center h-[calc(100vh-120px)]">
-          {" "}
-          {/* Centrar en pantalla */}
           <Spinner size={64} className="text-[#2E5C8A] mb-4" />
           <p className="text-lg text-gray-600">
             Cargando datos del dashboard... Por favor, espere.
@@ -1038,8 +959,6 @@ export default function EstadisticasPage() {
         </div>
       ) : errorLocal ? (
         <div className="max-w-7xl mx-auto py-8">
-          {" "}
-          {/* Contenedor para la alerta de error */}
           <Alert variant="destructive" className="bg-red-50 text-red-700">
             <XCircle className="h-5 w-5 mr-4" />
             <AlertTitle>Error al cargar las estadísticas</AlertTitle>
@@ -1047,14 +966,14 @@ export default function EstadisticasPage() {
           </Alert>
         </div>
       ) : (
-        <div className="max-w-7xl mx-auto space-y-4 ">
-          {/* Título principal */}
+        <div className="max-w-7xl mx-auto space-y-4">
           <div className="mb-2">
             <h2 className="text-3xl font-bold text-gray-900">Estadísticas</h2>
             <p className="text-gray-600">
               Datos para la toma de decisiones estratégicas
             </p>
           </div>
+
           <div className="flex justify-end">
             <Button
               variant="secondary"
@@ -1070,12 +989,11 @@ export default function EstadisticasPage() {
               Exportar a PDF
             </Button>
           </div>
+
+          {/* Filtros */}
           <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
             <div>
-              <label
-                htmlFor="select-escuela"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Filtrar por Escuela
               </label>
               <Select
@@ -1096,10 +1014,7 @@ export default function EstadisticasPage() {
             </div>
 
             <div>
-              <label
-                htmlFor="select-tematica"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Filtrar por Temática
               </label>
               <Select
@@ -1120,10 +1035,7 @@ export default function EstadisticasPage() {
             </div>
 
             <div>
-              <label
-                htmlFor="select-institucion"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Filtrar por Tipo de Fondo
               </label>
               <Select
@@ -1142,12 +1054,9 @@ export default function EstadisticasPage() {
                 </SelectContent>
               </Select>
             </div>
-            {/* Nuevo Filtro por Estatus */}
+
             <div>
-              <label
-                htmlFor="select-estatus"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Filtrar por Estatus
               </label>
               <Select
@@ -1166,9 +1075,8 @@ export default function EstadisticasPage() {
                 </SelectContent>
               </Select>
             </div>
+
             <div className="md:col-span-1 flex items-end">
-              {" "}
-              {/* md:col-span-1 para que ocupe una columna y flex items-end para alinear abajo */}
               <Button
                 onClick={resetFilters}
                 className="w-full cursor-pointer px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
@@ -1182,15 +1090,9 @@ export default function EstadisticasPage() {
             className="grid grid-cols-1 lg:grid-cols-[1.2fr_2fr_2fr] gap-8 mb-8"
             ref={estadisticasContentRef}
           >
-            {" "}
-            {/* Grid principal: 1 col móvil, 3 en grandes */}
-            {/* COLUMNA 1: Indicadores y Resúmenes */}
+            {/* Columna 1 */}
             <div className="space-y-8">
-              {" "}
-              {/* h-full para estirar verticalmente */}
-              {/* Indicadores Principales Compactos */}
               <div className="grid grid-cols-1 gap-4">
-                {/* Indicador: Proyectos en Cartera */}
                 <div className=" bg-[#e1edfd] rounded-lg p-4 shadow-sm border border-gray-100 flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">
@@ -1202,7 +1104,7 @@ export default function EstadisticasPage() {
                   </div>
                   <FileText className="w-6 h-6 text-gray-700 opacity-70" />
                 </div>
-                {/* Indicador: MM$ Formulados */}
+
                 <div className="bg-[#e1edfd]  rounded-lg p-4 shadow-sm border border-gray-100 flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">
@@ -1214,7 +1116,7 @@ export default function EstadisticasPage() {
                   </div>
                   <DollarSign className="w-6 h-6 text-gray-700 opacity-70" />
                 </div>
-                {/* Indicador: Escuelas FIN */}
+
                 <div className="bg-[#e1edfd]  rounded-lg p-4 shadow-sm border border-gray-100 flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">
@@ -1226,7 +1128,7 @@ export default function EstadisticasPage() {
                   </div>
                   <GraduationCap className="w-6 h-6 text-gray-700 opacity-70" />
                 </div>
-                {/* Indicador: Académicos Involucrados */}
+
                 <div className="bg-[#e1edfd]  rounded-lg p-4 shadow-sm border border-gray-100 flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">
@@ -1238,7 +1140,7 @@ export default function EstadisticasPage() {
                   </div>
                   <Users className="w-6 h-6 text-gray-700 opacity-70" />
                 </div>
-                {/* Indicador: Empresas Partners */}
+
                 <div className="bg-[#e1edfd] rounded-lg p-4 shadow-sm border border-gray-100 flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">
@@ -1248,7 +1150,7 @@ export default function EstadisticasPage() {
                   </div>
                   <Building2 className="w-6 h-6 text-gray-700 opacity-70" />
                 </div>
-                {/* Indicador: Universidades Partners */}
+
                 <div className="bg-[#e1edfd]  rounded-lg p-4 shadow-sm border border-gray-100 flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">
@@ -1258,10 +1160,9 @@ export default function EstadisticasPage() {
                   </div>
                   <University className="w-6 h-6 text-gray-700 opacity-70" />
                 </div>
-              </div>{" "}
-              {/* Fin del grid de indicadores pequeños */}
-              {/* Temáticas Destacadas - Tarjeta Compacta */}
-              <div className="bg-[#e1edfd]  items-center  rounded-xl p-6 text-gray-900 shadow-lg border border-gray-100">
+              </div>
+
+              <div className="bg-[#e1edfd] items-center rounded-xl p-6 text-gray-900 shadow-lg border border-gray-100">
                 <h3 className="text-lg text-center font-semibold">
                   Temáticas Destacadas
                 </h3>
@@ -1279,18 +1180,17 @@ export default function EstadisticasPage() {
                   ))}
                 </div>
               </div>
-              {/* Instrumentos Postulados - Tarjeta Compacta */}
-              <div className="bg-[#e1edfd]  rounded-xl p-6 text-gray-900 shadow-lg border border-gray-100">
-                <h3 className="text-lg  text-center font-semibold">
+
+              <div className="bg-[#e1edfd] rounded-xl p-6 text-gray-900 shadow-lg border border-gray-100">
+                <h3 className="text-lg text-center font-semibold">
                   Instrumentos Postulados
                 </h3>
                 <h3 className="text-sm text-gray-500 text-center font-semibold mb-4">
                   Top 5 (por Monto)
                 </h3>
-                <div className="flex flex-col ">
+                <div className="flex flex-col">
                   {instrumentosPostulados.map((instrumento, index) => (
-                    <div className="flex items-center mb-2 gap-4">
-                      {" "}
+                    <div key={index} className="flex items-center mb-2 gap-4">
                       {renderInstitucionLogo(instrumento.name || "")}
                       <span>{instrumento.name || "Sin información"}</span>
                       <span className="font-semibold">
@@ -1300,13 +1200,10 @@ export default function EstadisticasPage() {
                   ))}
                 </div>
               </div>
-            </div>{" "}
-            {/* Fin de la COLUMNA 1 */}
-            {/* COLUMNA 2: Gráficos de Barras (Profesores por Unidad y Proyectos por Profesor) */}
+            </div>
+
+            {/* Columna 2 */}
             <div className="space-y-8">
-              {" "}
-              {/* Ocupa 1/3 del ancho, y deja espacio entre gráficos */}
-              {/* Proyectos por Profesor - Gráfico de Barras */}
               <div className="bg-white rounded-lg shadow-lg p-6">
                 <h4 className="text-lg font-semibold text-gray-900">
                   Proyectos por Profesor
@@ -1333,9 +1230,8 @@ export default function EstadisticasPage() {
                   )}
                 </div>
               </div>
-              {/* Proyectos por Unidad (Gráfico de Barras) */}
+
               <div className="bg-white rounded-lg shadow-lg p-6">
-                {" "}
                 <h4 className="text-lg font-semibold text-gray-900">
                   Proyectos por Unidad Académica
                 </h4>
@@ -1361,7 +1257,7 @@ export default function EstadisticasPage() {
                   )}
                 </div>
               </div>
-              {/* Profesores por Unidad Académica - Gráfico de Barras */}
+
               <div className="bg-white rounded-lg shadow-lg p-6">
                 <h4 className="text-lg font-semibold text-gray-900">
                   Profesores por Unidad Académica
@@ -1387,13 +1283,10 @@ export default function EstadisticasPage() {
                   )}
                 </div>
               </div>
-            </div>{" "}
-            {/* Fin de la COLUMNA 2 */}
-            {/* COLUMNA 3: Gráficos de Barras (Proyectos por Temática, Proyectos por Tipo de Fondo) */}
+            </div>
+
+            {/* Columna 3 */}
             <div className="lg:col-span-1 space-y-8">
-              {" "}
-              {/* Ocupa 1/3 del ancho, y deja espacio entre gráficos */}
-              {/* Proyectos por Temática (Bar Chart horizontal) */}
               <div className="bg-white rounded-lg shadow-lg p-6">
                 <h4 className="text-lg font-semibold text-gray-900">
                   Proyectos por Temática
@@ -1420,7 +1313,7 @@ export default function EstadisticasPage() {
                   )}
                 </div>
               </div>
-              {/* Proyectos por Tipo de Fondo (Bar Chart horizontal) */}
+
               <div className="bg-white rounded-lg shadow-lg p-6">
                 <h4 className="text-lg font-semibold text-gray-900">
                   Proyectos por Tipo de Fondo
@@ -1448,7 +1341,6 @@ export default function EstadisticasPage() {
                 </div>
               </div>
             </div>
-            {/* Fin de la COLUMNA 3 */}
           </div>
         </div>
       )}

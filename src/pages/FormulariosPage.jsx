@@ -1,25 +1,19 @@
 import { useState, useEffect, useCallback } from "react";
 import {
-  BarChart3,
   Calendar,
-  ChevronDown,
-  Download,
   FileText,
   Filter,
-  Home,
-  PieChart,
   School,
   User,
-  Users,
   XCircle,
   List,
   Info,
 } from "lucide-react";
 
-import { Spinner } from "@/components/ui/spinner"; // Importa el Spinner de Shadcn
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; // Importa Alert de Shadcn
-import { Button } from "@/components/ui/button"; // Importa Button de Shadcn
-import { Input } from "@/components/ui/input"; // Importa Input de Shadcn
+import { Spinner } from "@/components/ui/spinner";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -28,39 +22,28 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-import { useError } from "@/contexts/ErrorContext"; // Importa tu hook de error global
-
-import respuestasCuestionarioService from "../api/respuestas-cuestionario.js";
-import academicosService from "../api/academicos.js";
-import unidadesAcademicasService from "../api/unidadesacademicas.js";
-import cuestionariosService from "../api/cuestionarios.js";
+import { useError } from "@/contexts/ErrorContext";
 
 export default function FormulariosPage() {
-  // Estados para los datos reales de la API
-  const [respuestasData, setRespuestasData] = useState([]); // Todas las respuestas del cuestionario
-  const [preguntasData, setPreguntasData] = useState([]); // Preguntas del cuestionario
+  const VITE_URL_PERFIL_PROYECTOS = import.meta.env.VITE_URL_PERFIL_PROYECTOS;
+  const VITE_URL_PREGUNTAS_PERFIL = import.meta.env.VITE_URL_PREGUNTAS_PERFIL;
 
-  // Mapas para IDs a Nombres
-  const [academicosMap, setAcademicosMap] = useState({}); // id_academico -> {nombre_completo, ...}
-  const [unidadesMap, setUnidadesMap] = useState({}); // id_unidad -> {nombre, ...}
+  const [respuestasData, setRespuestasData] = useState([]);
 
-  // Estados de carga y error
   const [loading, setLoading] = useState(true);
   const [errorLocal, setErrorLocal] = useState(null);
   const { setError: setErrorGlobal } = useError();
 
-  const [filtroAcademico, setFiltroAcademico] = useState("todos"); // Valor "todos" para select
-  const [filtroEscuela, setFiltroEscuela] = useState("todos"); // Valor "todos" para select
-  const [filtroFecha, setFiltroFecha] = useState(""); // Fecha en formato YYYY-MM-DD
-  const [respuestaSeleccionadaId, setRespuestaSeleccionadaId] = useState(null); // No seleccionar nada al inicio
+  const [filtroAcademico, setFiltroAcademico] = useState("todos");
+  const [filtroEscuela, setFiltroEscuela] = useState("todos");
+  const [filtroFecha, setFiltroFecha] = useState("");
+  const [respuestaSeleccionadaId, setRespuestaSeleccionadaId] = useState(null);
 
-  // --- Funciones Helper ---
-  // Formatear fecha para la UI
   const formatDate = useCallback((dateString) => {
     if (!dateString) return "Sin fecha";
     try {
       const date = new Date(dateString);
-      if (isNaN(date.getTime())) return "Fecha Inválida"; // Usa getTime() para NaN check
+      if (isNaN(date.getTime())) return "Fecha Inválida";
       const options = { year: "numeric", month: "long", day: "numeric" };
       return date.toLocaleDateString("es-CL", options);
     } catch (e) {
@@ -69,7 +52,6 @@ export default function FormulariosPage() {
     }
   }, []);
 
-  // Determinar si una fecha es "Hoy"
   const isToday = useCallback((dateString) => {
     if (!dateString) return false;
     try {
@@ -80,7 +62,7 @@ export default function FormulariosPage() {
         date.getMonth() === today.getMonth() &&
         date.getDate() === today.getDate()
       );
-    } catch (e) {
+    } catch {
       return false;
     }
   }, []);
@@ -89,74 +71,96 @@ export default function FormulariosPage() {
     setLoading(true);
     setErrorLocal(null);
     setErrorGlobal(null);
+
     try {
-      // Realizar todas las llamadas a la API en paralelo
-      const [respuestasRes, academicosRes, unidadesRes, cuestionariosRes] =
-        await Promise.all([
-          respuestasCuestionarioService.getAllRespuestasCuestionario(),
-          academicosService.getAllAcademicos(),
-          unidadesAcademicasService.getAllUnidadesAcademicas(),
-          cuestionariosService.getAllCuestionarios(),
-        ]);
+      if (!VITE_URL_PERFIL_PROYECTOS) {
+        throw new Error(
+          "Falta VITE_URL_PERFIL_PROYECTOS en las variables de entorno."
+        );
+      }
+      if (!VITE_URL_PREGUNTAS_PERFIL) {
+        throw new Error(
+          "Falta VITE_URL_PREGUNTAS_PERFIL en las variables de entorno."
+        );
+      }
 
-      // Procesar datos de académicos: id -> {nombre_completo, ...}
-      const newAcademicosMap = academicosRes.reduce((map, acad) => {
-        map[acad.id_academico] = {
-          ...acad,
-          nombre_completo:
-            `${acad.nombre} ${acad.a_paterno || ""} ${acad.a_materno || ""}`.trim(),
-        };
-        return map;
+      const [proyectosRes, preguntasRes] = await Promise.all([
+        fetch(VITE_URL_PERFIL_PROYECTOS, {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        }),
+        fetch(VITE_URL_PREGUNTAS_PERFIL, {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        }),
+      ]);
+
+      if (!proyectosRes.ok) {
+        throw new Error(`Error HTTP proyectos: ${proyectosRes.status}`);
+      }
+      if (!preguntasRes.ok) {
+        throw new Error(`Error HTTP preguntas: ${preguntasRes.status}`);
+      }
+
+      const items = await proyectosRes.json();
+      const preguntas = await preguntasRes.json();
+
+      if (!Array.isArray(items)) {
+        throw new Error("La API de proyectos no devolvió un array.");
+      }
+      if (!Array.isArray(preguntas)) {
+        throw new Error("La API de preguntas no devolvió un array.");
+      }
+
+      // Map: numero -> texto pregunta
+      const preguntasMap = preguntas.reduce((acc, p) => {
+        if (typeof p?.numero === "number") {
+          acc[p.numero] = p.pregunta || `Pregunta ${p.numero}`;
+        }
+        return acc;
       }, {});
-      setAcademicosMap(newAcademicosMap);
 
-      // Procesar datos de unidades: id -> {nombre, ...}
-      const newUnidadesMap = unidadesRes.reduce((map, unidad) => {
-        map[unidad.id_unidad] = unidad;
-        return map;
-      }, {});
-      setUnidadesMap(newUnidadesMap); // Necesitarás este estado si quieres el nombre de la escuela
-
-      // Procesar preguntas: id -> pregunta (para fácil acceso)
-      const newPreguntasMap = cuestionariosRes.reduce((map, q) => {
-        map[q.id_cuestionario] = q.pregunta;
-        return map;
-      }, {});
-      setPreguntasData(newPreguntasMap); // Guardar el mapa de preguntas
-
-      // Procesar respuestas: mapear IDs a nombres
-      const processedRespuestas = respuestasRes.map((res) => {
-        const academico = newAcademicosMap[res.nombre_investigador];
-
-        const unidadAcademica = newUnidadesMap[res.escuela]; // Acceder a la unidad a través del académico
+      const processedRespuestas = items.map((item) => {
+        const respuestasArray = Array.isArray(item.respuestas)
+          ? item.respuestas
+          : [];
 
         return {
-          id: res.id, // ID de la respuesta
-          nombre: academico?.nombre_completo || "Desconocido",
-          escuela: unidadAcademica?.nombre || "Desconocida", // Nombre de la unidad/escuela
-          fecha: res.fecha_creacion, // Fecha en formato ISO string
-          // Mapear respuestas a las preguntas (asumiendo respuesta_1 a respuesta_9)
-          respuestas: Object.keys(res)
-            .filter((key) => key.startsWith("respuesta_"))
-            .map((key) => ({
-              numero: parseInt(key.replace("respuesta_", ""), 10),
-              texto:
-                newPreguntasMap[parseInt(key.replace("respuesta_", ""), 10)] ||
-                `Pregunta ${key.replace("respuesta_", "")}`, // Texto de la pregunta
-              respuesta: res[key] || "Sin respuesta", // La respuesta dada
-            }))
-            .sort((a, b) => a.numero - b.numero), // Ordenar por número de pregunta
+          id: item._id,
+          nombre: item.investigador || "Desconocido",
+          escuela: item.escuela || "Desconocida",
+          fecha: item.fecha_creacion || null,
+          titulo: item.titulo,
+          respuestas: respuestasArray
+            .map((respuestaTexto, index) => {
+              const numero = index + 1;
+
+              return {
+                numero,
+                // AQUÍ se conecta por numero con VITE_URL_PREGUNTAS_PERFIL
+                texto: preguntasMap[numero] ?? `Pregunta ${numero}`,
+                respuesta: respuestaTexto || "Sin respuesta",
+              };
+            })
+            .sort((a, b) => a.numero - b.numero),
         };
       });
 
       setRespuestasData(processedRespuestas);
-      if (processedRespuestas.length > 0) {
-        setRespuestaSeleccionadaId(processedRespuestas[0].id); // Seleccionar la primera respuesta por defecto
-      }
+      setRespuestaSeleccionadaId(
+        processedRespuestas.length > 0 ? processedRespuestas[0].id : null
+      );
     } catch (err) {
       console.error("Error fetching data for FormulariosPage:", err);
+
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Error desconocido al cargar datos";
+
+      setErrorLocal(message);
       setErrorGlobal({
-        type: "error", // Forzar a tipo error si falló
+        type: "error",
         title: "Error al cargar los formularios.",
       });
     } finally {
@@ -164,23 +168,20 @@ export default function FormulariosPage() {
     }
   };
 
-  // Efecto para llamar a fetchData al montar el componente
   useEffect(() => {
     fetchData();
-  }, []); // El array vacío asegura que se ejecute una sola vez al montar
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Opciones únicas para los Selects de filtro (basadas en respuestasData)
   const uniqueAcademicos = [...new Set(respuestasData.map((r) => r.nombre))]
     .filter(Boolean)
     .sort();
+
   const uniqueEscuelas = [...new Set(respuestasData.map((r) => r.escuela))]
     .filter(Boolean)
     .sort();
-  // Las fechas se mostrarán en el filtro de fecha, no en un select.
 
-  // Esta es la versión CORRECTA de la lógica para el filtro
   const respuestasFiltradas = respuestasData.filter((r) => {
-    // Ambas variables se definen aquí, en el ámbito de este callback
     const coincideAcademico =
       filtroAcademico === "todos" || r.nombre === filtroAcademico;
     const coincideEscuela =
@@ -190,15 +191,12 @@ export default function FormulariosPage() {
 
     return coincideAcademico && coincideEscuela && coincideFecha;
   });
-  // Si la respuesta seleccionada no está en las filtradas, o no hay nada seleccionado,
-  // selecciona la primera de las filtradas (o null si no hay ninguna)
+
   const respuestaSeleccionada =
     respuestasFiltradas.find((r) => r.id === respuestaSeleccionadaId) ||
     respuestasFiltradas[0] ||
-    null; // Si no hay respuestas filtradas, null.
+    null;
 
-  // Efecto para actualizar `respuestaSeleccionadaId` si la `respuestaSeleccionada` cambia
-  // Esto asegura que la selección visual sea correcta después de filtrar.
   useEffect(() => {
     if (
       respuestaSeleccionada &&
@@ -206,14 +204,14 @@ export default function FormulariosPage() {
     ) {
       setRespuestaSeleccionadaId(respuestaSeleccionada.id);
     } else if (!respuestaSeleccionada && respuestaSeleccionadaId !== null) {
-      setRespuestaSeleccionadaId(null); // Si no hay respuesta seleccionada, resetear el ID.
+      setRespuestaSeleccionadaId(null);
     }
   }, [respuestaSeleccionada, respuestaSeleccionadaId]);
 
+  // OPCIÓN A: 1/3 izquierda, 2/3 derecha (recomendada)
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Título principal */}
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-gray-900">Formularios</h2>
           <p className="text-gray-600 mt-2">
@@ -221,7 +219,6 @@ export default function FormulariosPage() {
           </p>
         </div>
 
-        {/* Filtros */}
         <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex flex-wrap items-center gap-4">
@@ -230,7 +227,6 @@ export default function FormulariosPage() {
                 <span className="text-gray-700 font-medium">Filtrar por:</span>
               </div>
 
-              {/* Filtro Académico */}
               <div className="relative">
                 <Select
                   value={filtroAcademico}
@@ -250,7 +246,6 @@ export default function FormulariosPage() {
                 </Select>
               </div>
 
-              {/* Filtro Escuela */}
               <div className="relative">
                 <Select value={filtroEscuela} onValueChange={setFiltroEscuela}>
                   <SelectTrigger className="px-2 w-72 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white min-w-48">
@@ -267,7 +262,6 @@ export default function FormulariosPage() {
                 </Select>
               </div>
 
-              {/* Filtro Fecha */}
               <div className="relative">
                 <Input
                   type="date"
@@ -289,18 +283,14 @@ export default function FormulariosPage() {
               >
                 Reiniciar filtros
               </Button>
-              {/*<Button className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2">
-                <Download className="h-4 w-4" />
-                <span>Generar PDF</span>
-              </Button>*/}
             </div>
           </div>
         </div>
 
-        {/* Layout principal */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Lista de respuestas */}
-          <div className="bg-white rounded-lg shadow-lg ">
+        {/* CAMBIO: de 2 columnas iguales a 3 columnas con spans */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* IZQUIERDA: 1/3 */}
+          <div className="bg-white rounded-lg shadow-lg lg:col-span-1">
             <div className="p-6 border-b border-gray-200 flex items-center space-x-3">
               <List className="h-6 w-6 text-gray-600" />
               <h3 className="text-lg font-semibold text-gray-900">
@@ -309,11 +299,11 @@ export default function FormulariosPage() {
             </div>
 
             <div className="divide-y divide-gray-200">
-              {loading ? ( // Mostrar spinner si está cargando
+              {loading ? (
                 <div className="flex justify-center items-center h-48 py-8">
                   <Spinner size={32} className="text-[#2E5C8A]" />
                 </div>
-              ) : errorLocal ? ( // Mostrar error si hay
+              ) : errorLocal ? (
                 <Alert
                   variant="destructive"
                   className="bg-red-50 text-red-700 mx-4 my-4"
@@ -322,7 +312,7 @@ export default function FormulariosPage() {
                   <AlertTitle>Error al cargar respuestas</AlertTitle>
                   <AlertDescription>{errorLocal}</AlertDescription>
                 </Alert>
-              ) : respuestasFiltradas.length === 0 ? ( // Mostrar mensaje si no hay resultados
+              ) : respuestasFiltradas.length === 0 ? (
                 <Alert
                   variant="default"
                   className="bg-blue-50 text-blue-700 mx-4 my-4"
@@ -375,8 +365,8 @@ export default function FormulariosPage() {
             </div>
           </div>
 
-          {/* Detalles de la respuesta */}
-          <div className="bg-white rounded-lg shadow-lg">
+          {/* DERECHA: 2/3 */}
+          <div className="bg-white rounded-lg shadow-lg lg:col-span-2">
             <div className="p-6 border-b border-gray-200">
               <div className="flex items-center space-x-3">
                 <User className="h-6 w-6 text-gray-600" />
@@ -388,7 +378,6 @@ export default function FormulariosPage() {
 
             {respuestaSeleccionada && (
               <div className="p-6">
-                {/* Información del investigador */}
                 <div className="bg-blue-50 rounded-lg p-4 mb-6">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
@@ -429,7 +418,6 @@ export default function FormulariosPage() {
                   </div>
                 </div>
 
-                {/* Respuestas del cuestionario */}
                 <div>
                   <div className="flex items-center space-x-2 mb-4">
                     <FileText className="h-5 w-5 text-gray-600" />
